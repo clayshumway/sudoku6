@@ -7,6 +7,7 @@ import '../../../state/competition_provider.dart';
 import '../../../state/game_controller.dart';
 import '../../../utils/difficulty_label.dart';
 import '../../routing/app_router.dart';
+import '../../widgets/page_body.dart';
 import '../results/game_summary.dart';
 import 'widgets/game_toolbar.dart';
 import 'widgets/mistake_counter_widget.dart';
@@ -118,30 +119,38 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(difficultyLabel(widget.difficulty))),
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TimerWidget(seconds: state.elapsedSeconds),
-                  MistakeCounterWidget(mistakes: state.mistakes),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: SudokuGridWidget(state: state),
+        child: PageBody(
+          maxWidth: 520,
+          child: Column(
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TimerWidget(seconds: state.elapsedSeconds),
+                    MistakeCounterWidget(mistakes: state.mistakes),
+                  ],
                 ),
               ),
-            ),
-            NumberPadWidget(state: state),
-            GameToolbar(state: state),
-            const SizedBox(height: 8),
-          ],
+              Expanded(
+                // Biased above center: dead-centering the board in the
+                // leftover space read as a large arbitrary gap under the
+                // timer on tall phones.
+                child: Align(
+                  alignment: const Alignment(0, -0.55),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: SudokuGridWidget(state: state),
+                  ),
+                ),
+              ),
+              NumberPadWidget(state: state),
+              GameToolbar(state: state),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );

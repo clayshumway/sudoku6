@@ -74,6 +74,8 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
         children: [
           SafeArea(
             child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -140,6 +142,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
                     ),
                   ],
                 ),
+              ),
               ),
             ),
           ),

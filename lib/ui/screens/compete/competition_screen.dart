@@ -13,6 +13,7 @@ import '../../../state/competition_provider.dart';
 import '../../../utils/difficulty_label.dart';
 import '../../routing/app_router.dart';
 import '../../theme/palette.dart';
+import '../../widgets/page_body.dart';
 
 class CompetitionScreen extends ConsumerStatefulWidget {
   final String competitionId;
@@ -113,7 +114,8 @@ class _CompetitionScreenState extends ConsumerState<CompetitionScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Competition')),
-      body: async.when(
+      body: PageBody(
+        child: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => Center(
           child: Padding(
@@ -148,6 +150,7 @@ class _CompetitionScreenState extends ConsumerState<CompetitionScreen> {
           onPlay: () => _play(view),
           onReady: _markReady,
           onRematch: () => _goToRematch(view),
+        ),
         ),
       ),
     );

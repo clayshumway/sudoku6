@@ -6,6 +6,7 @@ import '../../../engine/models/difficulty.dart';
 import '../../../state/auth_provider.dart';
 import '../../../utils/difficulty_label.dart';
 import '../../theme/palette.dart';
+import '../../widgets/page_body.dart';
 
 class LeaderboardScreen extends ConsumerWidget {
   final Difficulty difficulty;
@@ -39,7 +40,8 @@ class LeaderboardScreen extends ConsumerWidget {
           ),
         ),
       ),
-      body: async.when(
+      body: PageBody(
+        child: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => _Message(
           icon: Icons.cloud_off,
@@ -64,6 +66,7 @@ class LeaderboardScreen extends ConsumerWidget {
             },
           );
         },
+        ),
       ),
     );
   }

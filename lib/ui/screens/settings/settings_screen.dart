@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/repositories/settings_repository.dart';
 import '../../../state/settings_provider.dart';
 import '../../theme/palette.dart';
+import '../../widgets/page_body.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -16,7 +17,8 @@ class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
+      body: PageBody(
+        child: ListView(
         children: [
           ListTile(
             title: const Text('Appearance'),
@@ -59,6 +61,7 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
         ],
+        ),
       ),
     );
   }

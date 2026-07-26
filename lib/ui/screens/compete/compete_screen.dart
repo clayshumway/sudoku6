@@ -10,6 +10,7 @@ import '../../../state/competition_provider.dart';
 import '../../../utils/difficulty_label.dart';
 import '../../routing/app_router.dart';
 import '../../theme/palette.dart';
+import '../../widgets/page_body.dart';
 
 class CompeteScreen extends ConsumerStatefulWidget {
   const CompeteScreen({super.key});
@@ -49,7 +50,8 @@ class _CompeteScreenState extends ConsumerState<CompeteScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Compete')),
-      body: ListView(
+      body: PageBody(
+        child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
           if (needsUsername) ...[
@@ -214,6 +216,7 @@ class _CompeteScreenState extends ConsumerState<CompeteScreen> {
                       ],
               ),
         ],
+        ),
       ),
     );
   }
