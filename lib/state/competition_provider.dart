@@ -23,17 +23,30 @@ class CompetitionView {
   /// User ids who have already finished [round].
   final Set<String> finishedCurrentRound;
 
+  /// User ids who have pressed Ready for the round after the current one.
+  final Set<String> readyNextRound;
+
   const CompetitionView({
     required this.competition,
     required this.players,
     required this.standings,
     required this.round,
     required this.finishedCurrentRound,
+    required this.readyNextRound,
   });
 
   bool get canStart => players.length >= 2;
   bool hasFinishedCurrent(String? userId) =>
       userId != null && finishedCurrentRound.contains(userId);
+  bool hasMarkedReady(String? userId) =>
+      userId != null && readyNextRound.contains(userId);
+
+  /// Whether every player *except the host* is ready for the next round.
+  /// The host's Start press counts as their own ready, so they aren't made
+  /// to tap two buttons.
+  bool allOthersReady(String hostId) => players
+      .where((p) => p.userId != hostId)
+      .every((p) => readyNextRound.contains(p.userId));
 }
 
 /// Live view of one competition. Re-reads on every realtime notification
@@ -55,14 +68,20 @@ final competitionViewProvider =
             competitionId: id, roundNumber: competition.currentRound)
         : null;
 
-    final finished = <String>{};
-    if (round != null) {
-      for (final s in standings) {
-        // Cheap proxy: a player's rounds_played reaching the current round
-        // means they've submitted for it.
-        if (s.roundsPlayed >= competition.currentRound) finished.add(s.userId);
-      }
-    }
+    // Asked for directly rather than inferred from rounds-played counts:
+    // the count proxy miscounts anyone who skipped an earlier round.
+    final finished = competition.currentRound > 0
+        ? await repo.roundFinishers(
+            competitionId: id, roundNumber: competition.currentRound)
+        : <String>{};
+
+    final hasNextRound = competition.currentRound > 0 &&
+        competition.currentRound < competition.rounds &&
+        !competition.isComplete;
+    final ready = hasNextRound
+        ? await repo.readyPlayers(
+            competitionId: id, roundNumber: competition.currentRound + 1)
+        : <String>{};
 
     return CompetitionView(
       competition: competition,
@@ -70,6 +89,7 @@ final competitionViewProvider =
       standings: standings,
       round: round,
       finishedCurrentRound: finished,
+      readyNextRound: ready,
     );
   }
 

@@ -24,7 +24,29 @@ class CompetitionScreen extends ConsumerStatefulWidget {
 
 class _CompetitionScreenState extends ConsumerState<CompetitionScreen> {
   bool _starting = false;
+  bool _readying = false;
   String? _error;
+
+  Future<void> _markReady() async {
+    final repo = ref.read(competitionRepositoryProvider);
+    if (repo == null) return;
+
+    setState(() {
+      _readying = true;
+      _error = null;
+    });
+    try {
+      await repo.markReady(widget.competitionId);
+      // Realtime/polling would catch up anyway; invalidate for snappiness.
+      ref.invalidate(competitionViewProvider(widget.competitionId));
+    } on CompetitionException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not mark you ready.');
+    } finally {
+      if (mounted) setState(() => _readying = false);
+    }
+  }
 
   String _shareUrl(String code) => 'https://s6.clayshumway.com/#/c/$code';
 
@@ -75,10 +97,12 @@ class _CompetitionScreenState extends ConsumerState<CompetitionScreen> {
           view: view,
           myId: myId,
           starting: _starting,
+          readying: _readying,
           error: _error,
           onStart: () => _startRound(view),
           onShare: () => _share(view.competition.code),
           onPlay: () => _play(view),
+          onReady: _markReady,
         ),
       ),
     );
@@ -113,19 +137,23 @@ class _Body extends StatelessWidget {
   final CompetitionView view;
   final String? myId;
   final bool starting;
+  final bool readying;
   final String? error;
   final VoidCallback onStart;
   final VoidCallback onShare;
   final VoidCallback onPlay;
+  final VoidCallback onReady;
 
   const _Body({
     required this.view,
     required this.myId,
     required this.starting,
+    required this.readying,
     required this.error,
     required this.onStart,
     required this.onShare,
     required this.onPlay,
+    required this.onReady,
   });
 
   @override
@@ -135,6 +163,15 @@ class _Body extends StatelessWidget {
     final isHost = c.isHost(myId);
     final iFinished = view.hasFinishedCurrent(myId);
     final roundsLeft = c.currentRound < c.rounds;
+    final iReady = view.hasMarkedReady(myId);
+    final allOthersReady = view.allOthersReady(c.hostId);
+    // The host doesn't press Ready (their Start counts), so readiness is
+    // shown out of the non-host player count.
+    final othersTotal =
+        view.players.where((p) => p.userId != c.hostId).length;
+    final othersReady = view.readyNextRound
+        .where((id) => id != c.hostId)
+        .length;
 
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -223,15 +260,53 @@ class _Body extends StatelessWidget {
               'players done',
               style: TextStyle(fontSize: 12, color: palette.noteText),
             ),
+            // The between-rounds pause: non-host players signal Ready, and
+            // the next round can't begin until everyone has.
+            if (roundsLeft && !isHost) ...[
+              const SizedBox(height: 12),
+              if (!iReady)
+                FilledButton(
+                  onPressed: readying ? null : onReady,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: readying
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : Text('Ready for round ${c.currentRound + 1}'),
+                  ),
+                )
+              else
+                Row(
+                  children: [
+                    Icon(Icons.hourglass_top,
+                        color: palette.noteText, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Ready — waiting for the host to start '
+                      '($othersReady of $othersTotal ready)',
+                      style: TextStyle(color: palette.noteText),
+                    ),
+                  ],
+                ),
+            ],
           ],
           if (isHost && roundsLeft) ...[
             const SizedBox(height: 12),
             OutlinedButton(
-              onPressed: starting ? null : onStart,
+              onPressed: starting || !allOthersReady ? null : onStart,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text('Start round ${c.currentRound + 1}'),
+                child: Text(allOthersReady
+                    ? 'Start round ${c.currentRound + 1}'
+                    : 'Waiting for ready ($othersReady of $othersTotal)'),
               ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Everyone else taps Ready first. Starting counts as yours.',
+              style: TextStyle(fontSize: 12, color: palette.noteText),
             ),
           ],
         ],

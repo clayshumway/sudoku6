@@ -107,7 +107,26 @@ abstract class CompetitionRepository {
 
   Future<List<StandingsRow>> standings(String competitionId);
 
-  /// Emits whenever the competition row or its players change, so a lobby
-  /// updates as people arrive without polling.
+  /// User ids with a submitted result for one round. Authoritative, unlike
+  /// inferring it from rounds-played counts, which breaks the moment someone
+  /// skips a round.
+  Future<Set<String>> roundFinishers({
+    required String competitionId,
+    required int roundNumber,
+  });
+
+  /// Marks the caller ready for the round after the current one. Returns that
+  /// round number.
+  Future<int> markReady(String competitionId);
+
+  /// User ids who have pressed Ready for [roundNumber].
+  Future<Set<String>> readyPlayers({
+    required String competitionId,
+    required int roundNumber,
+  });
+
+  /// Emits whenever the competition or its players/results/readiness change.
+  /// Implementations must not rely solely on realtime delivery -- see the
+  /// Supabase implementation for why.
   Stream<void> watch(String competitionId);
 }

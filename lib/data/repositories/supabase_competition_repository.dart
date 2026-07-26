@@ -201,8 +201,46 @@ class SupabaseCompetitionRepository implements CompetitionRepository {
   }
 
   @override
+  Future<Set<String>> roundFinishers({
+    required String competitionId,
+    required int roundNumber,
+  }) async {
+    final rows = await _client
+        .from('competition_results')
+        .select('user_id')
+        .eq('competition_id', competitionId)
+        .eq('round_number', roundNumber);
+    return (rows as List).map((r) => r['user_id'] as String).toSet();
+  }
+
+  @override
+  Future<int> markReady(String competitionId) async {
+    try {
+      final n = await _client
+          .rpc('mark_ready', params: {'p_competition': competitionId});
+      return (n as num).toInt();
+    } catch (e) {
+      _rethrow(e);
+    }
+  }
+
+  @override
+  Future<Set<String>> readyPlayers({
+    required String competitionId,
+    required int roundNumber,
+  }) async {
+    final rows = await _client
+        .from('competition_ready')
+        .select('user_id')
+        .eq('competition_id', competitionId)
+        .eq('round_number', roundNumber);
+    return (rows as List).map((r) => r['user_id'] as String).toSet();
+  }
+
+  @override
   Stream<void> watch(String competitionId) {
     final controller = StreamController<void>.broadcast();
+    Timer? poll;
     // Scoped to this competition only -- realtime connections are the first
     // Supabase limit that bites, so nothing subscribes app-wide.
     final channel = _client
@@ -239,10 +277,36 @@ class SupabaseCompetitionRepository implements CompetitionRepository {
             value: competitionId,
           ),
           callback: (_) => controller.add(null),
+        )
+        .onPostgresChanges(
+          event: sb.PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'competition_ready',
+          filter: sb.PostgresChangeFilter(
+            type: sb.PostgresChangeFilterType.eq,
+            column: 'competition_id',
+            value: competitionId,
+          ),
+          callback: (_) => controller.add(null),
         );
 
     channel.subscribe();
-    controller.onCancel = () => _client.removeChannel(channel);
+
+    // Polling fallback. A postgres_changes subscription to a table that isn't
+    // in the supabase_realtime publication -- or whose socket has silently
+    // died -- connects fine and then delivers nothing, which is exactly how
+    // the lobby froze in testing. Realtime makes updates instant; this makes
+    // them *guaranteed* within a few seconds. It only runs while a
+    // competition screen is actually being watched (autoDispose cancels it).
+    controller.onListen = () {
+      poll = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (!controller.isClosed) controller.add(null);
+      });
+    };
+    controller.onCancel = () {
+      poll?.cancel();
+      _client.removeChannel(channel);
+    };
     return controller.stream;
   }
 }
