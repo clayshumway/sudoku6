@@ -117,7 +117,7 @@ class _EmailStepState extends ConsumerState<_EmailStep> {
             state.cooldownSeconds > 0
                 ? 'A code was requested recently. You can ask for another in '
                     '${state.cooldownSeconds}s.'
-                : 'No password needed. We email you a 6-digit code.',
+                : 'No password needed. We email you a one-time code.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: palette.noteText),
           ),
@@ -137,15 +137,24 @@ class _CodeStep extends ConsumerStatefulWidget {
 class _CodeStepState extends ConsumerState<_CodeStep> {
   final _controller = TextEditingController();
 
+  /// Supabase's OTP length is a project setting (6-10 digits), not a fixed 6.
+  /// This project currently issues 8. Accepting the whole supported range
+  /// means changing that setting can't silently break sign-in -- an earlier
+  /// hardcoded 6 truncated the real code and made valid codes unenterable.
+  static const _minCodeLength = 6;
+  static const _maxCodeLength = 10;
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
 
+  bool get _canSubmit => _controller.text.trim().length >= _minCodeLength;
+
   void _submit() {
     final code = _controller.text.trim();
-    if (code.length < 6) return;
+    if (code.length < _minCodeLength) return;
     ref.read(signInControllerProvider.notifier).verifyCode(code);
   }
 
@@ -164,7 +173,7 @@ class _CodeStepState extends ConsumerState<_CodeStep> {
             style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
         Text(
-          'We sent a 6-digit code to\n${state.email}',
+          'We sent a sign-in code to\n${state.email}',
           textAlign: TextAlign.center,
           style: TextStyle(color: palette.noteText, height: 1.4),
         ),
@@ -176,22 +185,19 @@ class _CodeStepState extends ConsumerState<_CodeStep> {
           keyboardType: TextInputType.number,
           textInputAction: TextInputAction.go,
           textAlign: TextAlign.center,
-          maxLength: 6,
+          maxLength: _maxCodeLength,
           autofillHints: const [AutofillHints.oneTimeCode],
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           style: const TextStyle(
-              fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: 10),
+              fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: 6),
           decoration: const InputDecoration(
             counterText: '',
-            hintText: '000000',
+            hintText: 'Enter the code',
             border: OutlineInputBorder(),
           ),
-          onChanged: (v) {
-            setState(() {});
-            // Six digits is unambiguous -- submit without making them
-            // reach for a button.
-            if (v.trim().length == 6) _submit();
-          },
+          // No auto-submit on a fixed length: the code length is a server
+          // setting, so guessing it either fires early or never fires.
+          onChanged: (_) => setState(() {}),
           onSubmitted: (_) => _submit(),
         ),
         if (state.error != null) ...[
@@ -202,8 +208,7 @@ class _CodeStepState extends ConsumerState<_CodeStep> {
         ],
         const SizedBox(height: 20),
         FilledButton(
-          onPressed:
-              state.busy || _controller.text.trim().length < 6 ? null : _submit,
+          onPressed: state.busy || !_canSubmit ? null : _submit,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: state.busy
