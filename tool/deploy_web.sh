@@ -19,7 +19,26 @@ WORKTREE="$(mktemp -d)"
 cd "$REPO_ROOT"
 
 echo "==> Building web (base-href /, served at the domain root)"
-flutter build web --base-href /
+# flutter build web does not prune the output dir, so files from an older
+# build (e.g. a service worker from before --pwa-strategy=none) would
+# otherwise be redeployed forever.
+rm -rf "$REPO_ROOT/build/web"
+# --pwa-strategy=none: Flutter's service worker is deprecated, and on GitHub
+# Pages it stacks a second cache layer on top of the 600s max-age Pages already
+# sends -- which meant a deploy could stay invisible until a manual hard
+# refresh. Dropping it costs offline asset caching (the game itself still runs
+# entirely client-side) and buys deploys that actually show up.
+flutter build web --base-href / --pwa-strategy=none
+
+# Give main.dart.js a per-build URL. Pages caches by URL and we can't set
+# headers on it, so a changed query string is the only reliable way to stop a
+# browser serving yesterday's bundle from disk.
+BUILD_ID="$(git rev-parse --short HEAD)-$(date +%s)"
+BOOTSTRAP="$REPO_ROOT/build/web/flutter_bootstrap.js"
+if [ -f "$BOOTSTRAP" ]; then
+  perl -pi -e "s{\"mainJsPath\":\"main\.dart\.js\"}{\"mainJsPath\":\"main.dart.js?v=$BUILD_ID\"}g" "$BOOTSTRAP"
+  echo "==> Cache-busted main.dart.js as v=$BUILD_ID"
+fi
 
 echo "==> Preparing $BRANCH worktree"
 git fetch origin "$BRANCH" --quiet 2>/dev/null || true

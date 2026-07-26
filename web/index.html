@@ -116,6 +116,22 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <!--
+    One-time cleanup of Flutter's (now deprecated) service worker.
+
+    Builds no longer register it, but browsers that loaded an earlier build
+    still have one installed, and it keeps serving cached assets from disk --
+    which meant a deploy could stay invisible indefinitely rather than for the
+    600s GitHub Pages max-age. Unregistering here self-heals those visitors on
+    their next load; it is a no-op for everyone else.
+  -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (rs) {
+        rs.forEach(function (r) { r.unregister(); });
+      }).catch(function () {});
+    }
+  </script>
   <script src="flutter_bootstrap.js" async=""></script>
 
 
