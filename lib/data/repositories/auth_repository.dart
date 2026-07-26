@@ -25,9 +25,19 @@ abstract class AuthRepository {
   /// Emits on sign-in, sign-out, and token refresh.
   Stream<AuthUser?> authStateChanges();
 
-  /// Emails a one-time sign-in link. Creates the account on first use, so
+  /// Emails a one-time sign-in **code**. Creates the account on first use, so
   /// there is no separate sign-up path.
-  Future<void> sendMagicLink(String email);
+  ///
+  /// Deliberately a code rather than a clickable link: mail security scanners
+  /// (Gmail's among them) pre-fetch links in incoming mail, which consumes a
+  /// single-use magic link before the recipient ever clicks it. That failure
+  /// is intermittent and reads to the user as "the link is expired". A code
+  /// has no URL to fetch, and works even if the mail is read on another device.
+  Future<void> sendSignInCode(String email);
+
+  /// Exchanges an emailed code for a session. Throws [AuthException] when the
+  /// code is wrong or expired.
+  Future<void> verifySignInCode({required String email, required String code});
 
   Future<void> signOut();
 }

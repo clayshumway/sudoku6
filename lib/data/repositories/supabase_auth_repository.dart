@@ -1,7 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
-import '../../config/supabase_config.dart';
 import 'auth_repository.dart';
 
 class SupabaseAuthRepository implements AuthRepository {
@@ -22,14 +20,27 @@ class SupabaseAuthRepository implements AuthRepository {
       _client.auth.onAuthStateChange.map((e) => _toAuthUser(e.session?.user));
 
   @override
-  Future<void> sendMagicLink(String email) async {
+  Future<void> sendSignInCode(String email) async {
     try {
-      await _client.auth.signInWithOtp(
+      // No emailRedirectTo: the template emails a {{ .Token }} code and
+      // contains no link, so there is no redirect to configure and nothing
+      // for a mail scanner to consume.
+      await _client.auth.signInWithOtp(email: email.trim());
+    } on sb.AuthException catch (e) {
+      throw AuthException(e.message);
+    }
+  }
+
+  @override
+  Future<void> verifySignInCode({
+    required String email,
+    required String code,
+  }) async {
+    try {
+      await _client.auth.verifyOTP(
         email: email.trim(),
-        // Web returns to the site origin; Android comes back through the
-        // deep link registered in AndroidManifest.xml.
-        emailRedirectTo:
-            kIsWeb ? SupabaseConfig.webRedirect : SupabaseConfig.mobileRedirect,
+        token: code.trim(),
+        type: sb.OtpType.email,
       );
     } on sb.AuthException catch (e) {
       throw AuthException(e.message);

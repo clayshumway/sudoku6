@@ -51,40 +51,97 @@ final authAvailableProvider = Provider<bool>((ref) {
   return ref.watch(authRepositoryProvider) != null;
 });
 
-enum MagicLinkStatus { idle, sending, sent, error }
+enum SignInStep {
+  /// Collecting the email address.
+  email,
 
-class MagicLinkState {
-  final MagicLinkStatus status;
-  final String? message;
+  /// Sending the code.
+  sending,
 
-  const MagicLinkState({this.status = MagicLinkStatus.idle, this.message});
+  /// Code emailed; waiting for the user to type it.
+  codeSent,
+
+  /// Verifying the entered code.
+  verifying,
 }
 
-class MagicLinkController extends Notifier<MagicLinkState> {
-  @override
-  MagicLinkState build() => const MagicLinkState();
+class SignInState {
+  final SignInStep step;
 
-  Future<void> send(String email) async {
+  /// Retained after the code is sent -- `verifyOTP` needs the address again,
+  /// and the UI shows it back to the user.
+  final String email;
+  final String? error;
+
+  const SignInState({
+    this.step = SignInStep.email,
+    this.email = '',
+    this.error,
+  });
+
+  SignInState copyWith({SignInStep? step, String? email, String? error}) {
+    return SignInState(
+      step: step ?? this.step,
+      email: email ?? this.email,
+      // Explicitly clearable: each transition should drop the previous error.
+      error: error,
+    );
+  }
+
+  bool get busy =>
+      step == SignInStep.sending || step == SignInStep.verifying;
+}
+
+class SignInController extends Notifier<SignInState> {
+  @override
+  SignInState build() => const SignInState();
+
+  Future<void> sendCode(String email) async {
     final repo = ref.read(authRepositoryProvider);
     if (repo == null) return;
 
-    state = const MagicLinkState(status: MagicLinkStatus.sending);
+    final trimmed = email.trim();
+    state = state.copyWith(step: SignInStep.sending, email: trimmed);
     try {
-      await repo.sendMagicLink(email);
-      state = const MagicLinkState(status: MagicLinkStatus.sent);
+      await repo.sendSignInCode(trimmed);
+      state = state.copyWith(step: SignInStep.codeSent);
     } on AuthException catch (e) {
-      state = MagicLinkState(status: MagicLinkStatus.error, message: e.message);
+      state = state.copyWith(step: SignInStep.email, error: e.message);
     } catch (_) {
-      state = const MagicLinkState(
-        status: MagicLinkStatus.error,
-        message: 'Could not send the link. Check the address and try again.',
+      state = state.copyWith(
+        step: SignInStep.email,
+        error: 'Could not send the code. Check the address and try again.',
       );
     }
   }
 
-  void reset() => state = const MagicLinkState();
+  Future<void> verifyCode(String code) async {
+    final repo = ref.read(authRepositoryProvider);
+    if (repo == null) return;
+
+    state = state.copyWith(step: SignInStep.verifying);
+    try {
+      await repo.verifySignInCode(email: state.email, code: code);
+      // Success: the auth stream fires and the router redirect takes over.
+      ref.invalidate(myProfileProvider);
+    } on AuthException catch (_) {
+      // Supabase's raw message here is vague ("Token has expired or is
+      // invalid"); say the two things the user can actually act on.
+      state = state.copyWith(
+        step: SignInStep.codeSent,
+        error: 'That code is wrong or has expired. Check it, or resend.',
+      );
+    } catch (_) {
+      state = state.copyWith(
+        step: SignInStep.codeSent,
+        error: 'Could not verify that code. Try again.',
+      );
+    }
+  }
+
+  /// Back to the email step, e.g. to correct a typo in the address.
+  void changeEmail() => state = const SignInState();
 }
 
-final magicLinkControllerProvider =
-    NotifierProvider<MagicLinkController, MagicLinkState>(
-        MagicLinkController.new);
+final signInControllerProvider =
+    NotifierProvider<SignInController, SignInState>(SignInController.new);
