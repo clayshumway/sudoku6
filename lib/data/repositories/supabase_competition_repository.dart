@@ -29,6 +29,9 @@ class SupabaseCompetitionRepository implements CompetitionRepository {
         rounds: r['rounds'] as int,
         currentRound: r['current_round'] as int,
         status: _status(r['status'] as String),
+        createdAt: DateTime.parse(r['created_at'] as String),
+        // Absent until migration 0008 has been applied; null-safe either way.
+        rematchId: r['rematch_id'] as String?,
       );
 
   /// Postgres exceptions from our RPCs carry a human-written message
@@ -235,6 +238,42 @@ class SupabaseCompetitionRepository implements CompetitionRepository {
         .eq('competition_id', competitionId)
         .eq('round_number', roundNumber);
     return (rows as List).map((r) => r['user_id'] as String).toSet();
+  }
+
+  @override
+  Future<String> rematch(String competitionId) async {
+    try {
+      final code = await _client
+          .rpc('rematch_competition', params: {'p_competition': competitionId});
+      return code as String;
+    } catch (e) {
+      _rethrow(e);
+    }
+  }
+
+  @override
+  Future<List<Competition>> myCompetitions({int limit = 20}) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return const [];
+
+    final memberships = await _client
+        .from('competition_players')
+        .select('competition_id')
+        .eq('user_id', uid);
+    final ids = (memberships as List)
+        .map((r) => r['competition_id'] as String)
+        .toList();
+    if (ids.isEmpty) return const [];
+
+    final rows = await _client
+        .from('competitions')
+        .select()
+        .inFilter('id', ids)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return (rows as List)
+        .map((r) => _toCompetition(r as Map<String, dynamic>))
+        .toList();
   }
 
   @override

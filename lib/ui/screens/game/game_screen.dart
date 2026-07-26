@@ -77,7 +77,15 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     }
     if (!mounted) return;
     ref.invalidate(competitionViewProvider(id));
-    context.pushReplacement('${AppRoutes.competition}/$id');
+    // The round was *pushed* from the competition screen, so pop back to it.
+    // Replacing instead stacked a fresh copy per round, which made the back
+    // button appear to loop on the same screen forever.
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      // Deep-linked straight into a round: nothing underneath to pop to.
+      context.go('${AppRoutes.competition}/$id');
+    }
   }
 
   @override

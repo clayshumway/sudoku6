@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../data/repositories/competition_repository.dart';
 import '../../../engine/models/difficulty.dart';
 import '../../../state/auth_provider.dart';
 import '../../../state/competition_provider.dart';
@@ -183,8 +184,45 @@ class _CompeteScreenState extends ConsumerState<CompeteScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(color: palette.errorText)),
           ],
+          // Past and ongoing competitions. Finished ones are where Rematch
+          // lives, so this doubles as the way back to old groups.
+          ...ref.watch(myCompetitionsProvider).when(
+                loading: () => const <Widget>[],
+                error: (_, _) => const <Widget>[],
+                data: (comps) => comps.isEmpty
+                    ? const <Widget>[]
+                    : [
+                        const Divider(height: 48),
+                        Text('Your competitions',
+                            style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 4),
+                        for (final c in comps)
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                                '${c.code} · ${difficultyLabel(c.difficulty)}'),
+                            subtitle: Text(
+                              '${c.rounds} round${c.rounds == 1 ? "" : "s"} · '
+                              '${_statusLabel(c)}',
+                              style: TextStyle(
+                                  fontSize: 12, color: palette.noteText),
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => context
+                                .push('${AppRoutes.competition}/${c.id}'),
+                          ),
+                      ],
+              ),
         ],
       ),
     );
   }
+
+  String _statusLabel(Competition c) => switch (c.status) {
+        CompetitionStatus.lobby => 'waiting for players',
+        CompetitionStatus.active =>
+          'round ${c.currentRound} of ${c.rounds}',
+        CompetitionStatus.complete =>
+          c.rematchId != null ? 'finished · rematch started' : 'finished',
+      };
 }

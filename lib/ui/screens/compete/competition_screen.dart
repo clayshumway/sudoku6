@@ -25,7 +25,44 @@ class CompetitionScreen extends ConsumerStatefulWidget {
 class _CompetitionScreenState extends ConsumerState<CompetitionScreen> {
   bool _starting = false;
   bool _readying = false;
+  bool _rematching = false;
   String? _error;
+
+  /// Creates the rematch, or joins the one someone else already created --
+  /// both converge on the same new competition, so this is safe to press
+  /// from any player's screen in any order.
+  Future<void> _goToRematch(CompetitionView view) async {
+    final repo = ref.read(competitionRepositoryProvider);
+    if (repo == null) return;
+
+    setState(() {
+      _rematching = true;
+      _error = null;
+    });
+    try {
+      final String code;
+      final existingId = view.competition.rematchId;
+      if (existingId != null) {
+        final existing = await repo.byId(existingId);
+        if (existing == null) {
+          throw const CompetitionException('Could not find the rematch.');
+        }
+        code = existing.code;
+      } else {
+        code = await repo.rematch(widget.competitionId);
+      }
+      // join() is idempotent, so creator and follower share this path.
+      final newId = await repo.join(code);
+      if (!mounted) return;
+      context.pushReplacement('${AppRoutes.competition}/$newId');
+    } on CompetitionException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not start the rematch.');
+    } finally {
+      if (mounted) setState(() => _rematching = false);
+    }
+  }
 
   Future<void> _markReady() async {
     final repo = ref.read(competitionRepositoryProvider);
@@ -86,10 +123,21 @@ class _CompetitionScreenState extends ConsumerState<CompetitionScreen> {
         error: (_, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
-            child: Text(
-              "Couldn't load this competition.",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: palette.noteText),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "Couldn't load this competition.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: palette.noteText),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton(
+                  onPressed: () => ref.invalidate(
+                      competitionViewProvider(widget.competitionId)),
+                  child: const Text('Retry'),
+                ),
+              ],
             ),
           ),
         ),
@@ -98,11 +146,13 @@ class _CompetitionScreenState extends ConsumerState<CompetitionScreen> {
           myId: myId,
           starting: _starting,
           readying: _readying,
+          rematching: _rematching,
           error: _error,
           onStart: () => _startRound(view),
           onShare: () => _share(view.competition.code),
           onPlay: () => _play(view),
           onReady: _markReady,
+          onRematch: () => _goToRematch(view),
         ),
       ),
     );
@@ -138,22 +188,26 @@ class _Body extends StatelessWidget {
   final String? myId;
   final bool starting;
   final bool readying;
+  final bool rematching;
   final String? error;
   final VoidCallback onStart;
   final VoidCallback onShare;
   final VoidCallback onPlay;
   final VoidCallback onReady;
+  final VoidCallback onRematch;
 
   const _Body({
     required this.view,
     required this.myId,
     required this.starting,
     required this.readying,
+    required this.rematching,
     required this.error,
     required this.onStart,
     required this.onShare,
     required this.onPlay,
     required this.onReady,
+    required this.onRematch,
   });
 
   @override
@@ -185,7 +239,56 @@ class _Body extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        if (c.isComplete) _Winner(view: view, myId: myId),
+        if (c.isComplete) ...[
+          _Winner(view: view, myId: myId),
+          if (c.rematchId != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'A rematch has been started!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color: palette.primary, fontWeight: FontWeight.w600),
+              ),
+            ),
+          FilledButton.icon(
+            onPressed: rematching ? null : onRematch,
+            icon: rematching
+                ? const SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.replay, size: 18),
+            label: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(c.rematchId != null
+                  ? 'Join the rematch'
+                  : 'Rematch — same settings, new puzzles'),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            c.rematchId != null
+                ? 'Everyone from this competition can join it.'
+                : 'The old invite link will carry people into the rematch too.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: palette.noteText),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: () => context.push(AppRoutes.compete),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('New competition (different settings)'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => context.go(AppRoutes.home),
+            child: const Text('Back to home'),
+          ),
+          const SizedBox(height: 8),
+        ],
 
         // Lobby: waiting for people before anything is playable.
         if (c.inLobby) ...[

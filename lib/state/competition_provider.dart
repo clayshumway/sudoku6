@@ -70,18 +70,29 @@ final competitionViewProvider =
 
     // Asked for directly rather than inferred from rounds-played counts:
     // the count proxy miscounts anyone who skipped an earlier round.
-    final finished = competition.currentRound > 0
-        ? await repo.roundFinishers(
-            competitionId: id, roundNumber: competition.currentRound)
-        : <String>{};
+    //
+    // Both of these are auxiliary: they refine the view but the screen is
+    // fully usable without them. They degrade to empty rather than throw --
+    // a failing query here once took the whole competition screen down with
+    // "couldn't load" when a migration hadn't been applied yet.
+    var finished = const <String>{};
+    if (competition.currentRound > 0) {
+      try {
+        finished = await repo.roundFinishers(
+            competitionId: id, roundNumber: competition.currentRound);
+      } catch (_) {}
+    }
 
     final hasNextRound = competition.currentRound > 0 &&
         competition.currentRound < competition.rounds &&
         !competition.isComplete;
-    final ready = hasNextRound
-        ? await repo.readyPlayers(
-            competitionId: id, roundNumber: competition.currentRound + 1)
-        : <String>{};
+    var ready = const <String>{};
+    if (hasNextRound) {
+      try {
+        ready = await repo.readyPlayers(
+            competitionId: id, roundNumber: competition.currentRound + 1);
+      } catch (_) {}
+    }
 
     return CompetitionView(
       competition: competition,
@@ -100,6 +111,14 @@ final competitionViewProvider =
     final next = await load();
     if (next != null) yield next;
   }
+});
+
+/// The signed-in user's competition history, newest first.
+final myCompetitionsProvider =
+    FutureProvider.autoDispose<List<Competition>>((ref) async {
+  final repo = ref.watch(competitionRepositoryProvider);
+  if (repo == null) return const [];
+  return repo.myCompetitions();
 });
 
 enum CompeteAction { idle, working }

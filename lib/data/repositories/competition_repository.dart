@@ -10,6 +10,11 @@ class Competition {
   final int rounds;
   final int currentRound;
   final CompetitionStatus status;
+  final DateTime createdAt;
+
+  /// Set once someone starts a rematch of this (finished) competition.
+  /// Anyone still looking at this one can follow it across.
+  final String? rematchId;
 
   const Competition({
     required this.id,
@@ -19,6 +24,8 @@ class Competition {
     required this.rounds,
     required this.currentRound,
     required this.status,
+    required this.createdAt,
+    this.rematchId,
   });
 
   bool isHost(String? userId) => userId != null && userId == hostId;
@@ -124,6 +131,14 @@ abstract class CompetitionRepository {
     required String competitionId,
     required int roundNumber,
   });
+
+  /// Starts (or returns the existing) rematch of a finished competition and
+  /// returns its share code. Any player of the original can trigger it; a
+  /// second press converges on the first rematch instead of forking.
+  Future<String> rematch(String competitionId);
+
+  /// Competitions the signed-in user has played or is playing, newest first.
+  Future<List<Competition>> myCompetitions({int limit = 20});
 
   /// Emits whenever the competition or its players/results/readiness change.
   /// Implementations must not rely solely on realtime delivery -- see the
