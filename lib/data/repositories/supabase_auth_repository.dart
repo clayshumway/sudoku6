@@ -19,6 +19,15 @@ class SupabaseAuthRepository implements AuthRepository {
   Stream<AuthUser?> authStateChanges() =>
       _client.auth.onAuthStateChange.map((e) => _toAuthUser(e.session?.user));
 
+  /// Pulls the wait time out of Supabase's rate-limit message, which reads
+  /// "For security purposes, you can only request this after 36 seconds."
+  /// There's no structured field for it, so the number has to be parsed;
+  /// falls back to a conservative 60s if the wording ever changes.
+  static int _retryAfterFrom(String message) {
+    final m = RegExp(r'(\d+)\s*second').firstMatch(message);
+    return int.tryParse(m?.group(1) ?? '') ?? 60;
+  }
+
   @override
   Future<void> sendSignInCode(String email) async {
     try {
@@ -26,6 +35,11 @@ class SupabaseAuthRepository implements AuthRepository {
       // contains no link, so there is no redirect to configure and nothing
       // for a mail scanner to consume.
       await _client.auth.signInWithOtp(email: email.trim());
+    } on sb.AuthApiException catch (e) {
+      if (e.statusCode == '429' || e.code == 'over_email_send_rate_limit') {
+        throw AuthRateLimited(_retryAfterFrom(e.message));
+      }
+      throw AuthException(e.message);
     } on sb.AuthException catch (e) {
       throw AuthException(e.message);
     }

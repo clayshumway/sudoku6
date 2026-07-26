@@ -99,7 +99,7 @@ class _EmailStepState extends ConsumerState<_EmailStep> {
           ],
           const SizedBox(height: 20),
           FilledButton(
-            onPressed: state.busy ? null : _submit,
+            onPressed: state.canSend ? _submit : null,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: state.busy
@@ -107,12 +107,17 @@ class _EmailStepState extends ConsumerState<_EmailStep> {
                       height: 18,
                       width: 18,
                       child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Email me a sign-in code'),
+                  : Text(state.cooldownSeconds > 0
+                      ? 'Wait ${state.cooldownSeconds}s'
+                      : 'Email me a sign-in code'),
             ),
           ),
           const SizedBox(height: 12),
           Text(
-            'No password needed. We email you a 6-digit code.',
+            state.cooldownSeconds > 0
+                ? 'A code was requested recently. You can ask for another in '
+                    '${state.cooldownSeconds}s.'
+                : 'No password needed. We email you a 6-digit code.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: palette.noteText),
           ),
@@ -210,14 +215,31 @@ class _CodeStepState extends ConsumerState<_CodeStep> {
           ),
         ),
         const SizedBox(height: 8),
-        TextButton(
-          onPressed: state.busy
-              ? null
-              : () => ref.read(signInControllerProvider.notifier).changeEmail(),
-          child: const Text('Use a different email'),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextButton(
+              onPressed: state.canSend
+                  ? () => ref
+                      .read(signInControllerProvider.notifier)
+                      .sendCode(state.email)
+                  : null,
+              child: Text(state.cooldownSeconds > 0
+                  ? 'Resend in ${state.cooldownSeconds}s'
+                  : 'Resend code'),
+            ),
+            TextButton(
+              onPressed: state.busy
+                  ? null
+                  : () => ref
+                      .read(signInControllerProvider.notifier)
+                      .changeEmail(),
+              child: const Text('Change email'),
+            ),
+          ],
         ),
         Text(
-          "Codes can take a minute to arrive — check spam too.",
+          'Codes can take a minute to arrive — check spam too.',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12, color: palette.noteText),
         ),

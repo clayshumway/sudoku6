@@ -18,6 +18,16 @@ class AuthException implements Exception {
   String toString() => message;
 }
 
+/// Supabase enforces a short per-address cooldown between code requests.
+/// Modelled separately so the UI can show a countdown instead of an error --
+/// it isn't a failure the user caused or can fix by editing anything.
+class AuthRateLimited implements Exception {
+  final int retryAfterSeconds;
+  const AuthRateLimited(this.retryAfterSeconds);
+  @override
+  String toString() => 'Rate limited for $retryAfterSeconds s';
+}
+
 abstract class AuthRepository {
   /// Current user, or null when signed out.
   AuthUser? get currentUser;

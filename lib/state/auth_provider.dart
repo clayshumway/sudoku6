@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
@@ -73,28 +75,59 @@ class SignInState {
   final String email;
   final String? error;
 
+  /// Seconds left on the per-address send cooldown, 0 when clear.
+  final int cooldownSeconds;
+
   const SignInState({
     this.step = SignInStep.email,
     this.email = '',
     this.error,
+    this.cooldownSeconds = 0,
   });
 
-  SignInState copyWith({SignInStep? step, String? email, String? error}) {
+  SignInState copyWith({
+    SignInStep? step,
+    String? email,
+    String? error,
+    int? cooldownSeconds,
+  }) {
     return SignInState(
       step: step ?? this.step,
       email: email ?? this.email,
       // Explicitly clearable: each transition should drop the previous error.
       error: error,
+      cooldownSeconds: cooldownSeconds ?? this.cooldownSeconds,
     );
   }
 
   bool get busy =>
       step == SignInStep.sending || step == SignInStep.verifying;
+
+  bool get canSend => !busy && cooldownSeconds == 0;
 }
 
 class SignInController extends Notifier<SignInState> {
+  Timer? _cooldownTimer;
+
   @override
-  SignInState build() => const SignInState();
+  SignInState build() {
+    ref.onDispose(() => _cooldownTimer?.cancel());
+    return const SignInState();
+  }
+
+  void _startCooldown(int seconds) {
+    _cooldownTimer?.cancel();
+    state = state.copyWith(cooldownSeconds: seconds);
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      final left = state.cooldownSeconds - 1;
+      if (left <= 0) {
+        t.cancel();
+        state = state.copyWith(cooldownSeconds: 0);
+      } else {
+        state = state.copyWith(cooldownSeconds: left);
+      }
+    });
+  }
 
   Future<void> sendCode(String email) async {
     final repo = ref.read(authRepositoryProvider);
@@ -105,12 +138,25 @@ class SignInController extends Notifier<SignInState> {
     try {
       await repo.sendSignInCode(trimmed);
       state = state.copyWith(step: SignInStep.codeSent);
+      // Supabase applies the cooldown to every request, including the one
+      // that just succeeded -- start it now so "Resend" is correctly
+      // disabled rather than failing when tapped.
+      _startCooldown(60);
+    } on AuthRateLimited catch (e) {
+      // Not an error the user caused. If a code was already sent, move them
+      // forward to enter it rather than stranding them on the email step.
+      state = state.copyWith(
+        step: state.email.isNotEmpty && state.step == SignInStep.sending
+            ? SignInStep.codeSent
+            : SignInStep.email,
+      );
+      _startCooldown(e.retryAfterSeconds);
     } on AuthException catch (e) {
       state = state.copyWith(step: SignInStep.email, error: e.message);
     } catch (_) {
       state = state.copyWith(
         step: SignInStep.email,
-        error: 'Could not send the code. Check the address and try again.',
+        error: 'Could not reach the server. Check your connection.',
       );
     }
   }
@@ -140,7 +186,10 @@ class SignInController extends Notifier<SignInState> {
   }
 
   /// Back to the email step, e.g. to correct a typo in the address.
-  void changeEmail() => state = const SignInState();
+  /// Keeps any active cooldown -- it's enforced server-side per address, so
+  /// pretending it's gone would just produce another failure.
+  void changeEmail() =>
+      state = SignInState(cooldownSeconds: state.cooldownSeconds);
 }
 
 final signInControllerProvider =
