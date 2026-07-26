@@ -30,6 +30,11 @@ class SettingsController extends Notifier<AppSettings> {
     state = state.copyWith(hapticsEnabled: enabled);
     await ref.read(settingsRepositoryProvider).save(state);
   }
+
+  Future<void> setPaletteId(String id) async {
+    state = state.copyWith(paletteId: id);
+    await ref.read(settingsRepositoryProvider).save(state);
+  }
 }
 
 final settingsControllerProvider =

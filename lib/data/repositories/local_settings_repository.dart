@@ -19,6 +19,7 @@ class LocalSettingsRepository implements SettingsRepository {
       ),
       soundEnabled: hive.soundEnabled,
       hapticsEnabled: hive.hapticsEnabled,
+      paletteId: hive.paletteId,
     );
   }
 
@@ -30,6 +31,7 @@ class LocalSettingsRepository implements SettingsRepository {
         themeMode: settings.themeMode.name,
         soundEnabled: settings.soundEnabled,
         hapticsEnabled: settings.hapticsEnabled,
+        paletteId: settings.paletteId,
       ),
     );
   }

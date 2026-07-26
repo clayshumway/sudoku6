@@ -5,6 +5,7 @@ import 'data/repositories/settings_repository.dart';
 import 'state/settings_provider.dart';
 import 'ui/routing/app_router.dart';
 import 'ui/theme/app_theme.dart';
+import 'ui/theme/palette.dart';
 
 class SudokuApp extends ConsumerWidget {
   const SudokuApp({super.key});
@@ -12,11 +13,12 @@ class SudokuApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsControllerProvider);
+    final scheme = AppPalettes.byId(settings.paletteId);
     return MaterialApp.router(
       title: 'Sudoku 6',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
+      theme: AppTheme.light(scheme),
+      darkTheme: AppTheme.dark(scheme),
       themeMode: _toThemeMode(settings.themeMode),
       routerConfig: appRouter,
     );
