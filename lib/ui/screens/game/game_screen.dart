@@ -17,7 +17,15 @@ class GameScreen extends ConsumerStatefulWidget {
   final Difficulty difficulty;
   final bool daily;
 
-  const GameScreen({super.key, required this.difficulty, this.daily = false});
+  /// Set when arriving from a shared challenge link, pinning the exact puzzle.
+  final int? seed;
+
+  const GameScreen({
+    super.key,
+    required this.difficulty,
+    this.daily = false,
+    this.seed,
+  });
 
   @override
   ConsumerState<GameScreen> createState() => _GameScreenState();
@@ -29,7 +37,9 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     super.initState();
     Future.microtask(() {
       final controller = ref.read(gameControllerProvider.notifier);
-      if (widget.daily) {
+      if (widget.seed != null) {
+        controller.startSeededPuzzle(widget.difficulty, widget.seed!);
+      } else if (widget.daily) {
         controller.startDailyPuzzle(widget.difficulty, DateTime.now());
       } else {
         controller.resume(widget.difficulty);
@@ -49,6 +59,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           elapsedSeconds: next.elapsedSeconds,
           mistakes: next.mistakes,
           hintsUsed: next.hintsUsed,
+          seed: next.puzzle.seed,
+          givens: List<int>.unmodifiable(next.puzzle.givens.cells),
         );
         context.pushReplacement(AppRoutes.results, extra: summary);
       }

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/repositories/puzzle_repository.dart';
 import '../data/repositories/stats_repository.dart';
 import '../engine/engine.dart';
+import 'auth_provider.dart';
 import 'game_state.dart';
 import 'repository_providers.dart';
 
@@ -33,6 +34,16 @@ class GameController extends Notifier<GameState?> {
   Future<void> startNewGame(Difficulty difficulty) async {
     final repo = ref.read(puzzleRepositoryProvider);
     final puzzle = await repo.nextPuzzle(difficulty);
+    state = GameState.fromPuzzle(puzzle);
+    _startTicker();
+  }
+
+  /// Starts one exact puzzle from a shared link. Does not touch the saved
+  /// in-progress game for that tier, so opening a friend's challenge can't
+  /// clobber a puzzle you're midway through.
+  Future<void> startSeededPuzzle(Difficulty difficulty, int seed) async {
+    final repo = ref.read(puzzleRepositoryProvider);
+    final puzzle = await repo.puzzleForSeed(difficulty, seed);
     state = GameState.fromPuzzle(puzzle);
     _startTicker();
   }
@@ -236,6 +247,21 @@ class GameController extends Notifier<GameState?> {
     ));
     final puzzleRepo = ref.read(puzzleRepositoryProvider);
     await puzzleRepo.clearInProgress(finished.puzzle.difficulty);
+
+    // Publish to the leaderboard. Best-effort and last: local stats and the
+    // results screen must not depend on the network, so a signed-out player
+    // or a failed request changes nothing the player can see.
+    try {
+      await ref.read(solvesRepositoryProvider)?.recordSolve(
+            difficulty: finished.puzzle.difficulty,
+            seed: finished.puzzle.seed,
+            elapsedMs: finished.elapsedSeconds * 1000,
+            mistakes: finished.mistakes,
+            hintsUsed: finished.hintsUsed,
+          );
+    } catch (_) {
+      // Ignored on purpose -- see above.
+    }
   }
 
   Future<void> _persist(GameState current) async {

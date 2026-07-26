@@ -23,6 +23,10 @@ class GameSaveData {
 abstract class PuzzleRepository {
   Future<Puzzle> nextPuzzle(Difficulty difficulty);
   Future<Puzzle> dailyPuzzle(Difficulty difficulty, DateTime date);
+
+  /// Regenerates one exact puzzle. Backs shared challenge links: the seed is
+  /// the puzzle, so two people get identical boards with nothing transmitted.
+  Future<Puzzle> puzzleForSeed(Difficulty difficulty, int seed);
   Future<void> saveInProgress(GameSaveData data);
   Future<GameSaveData?> loadInProgress(Difficulty difficulty);
   Future<void> clearInProgress(Difficulty difficulty);

@@ -35,10 +35,19 @@ flutter build web --base-href / --pwa-strategy=none
 # browser serving yesterday's bundle from disk.
 BUILD_ID="$(git rev-parse --short HEAD)-$(date +%s)"
 BOOTSTRAP="$REPO_ROOT/build/web/flutter_bootstrap.js"
+INDEX="$REPO_ROOT/build/web/index.html"
+
+# Version the whole load chain, not just the last link. index.html ->
+# flutter_bootstrap.js -> main.dart.js: leaving the bootstrap unversioned
+# meant a cached bootstrap kept requesting the *previous* build's
+# main.dart.js, so deploys still looked stale even with a busted bundle URL.
 if [ -f "$BOOTSTRAP" ]; then
   perl -pi -e "s{\"mainJsPath\":\"main\.dart\.js\"}{\"mainJsPath\":\"main.dart.js?v=$BUILD_ID\"}g" "$BOOTSTRAP"
-  echo "==> Cache-busted main.dart.js as v=$BUILD_ID"
 fi
+if [ -f "$INDEX" ]; then
+  perl -pi -e "s{flutter_bootstrap\.js(\?v=[^\"']*)?}{flutter_bootstrap.js?v=$BUILD_ID}g" "$INDEX"
+fi
+echo "==> Cache-busted bootstrap + bundle as v=$BUILD_ID"
 
 echo "==> Preparing $BRANCH worktree"
 git fetch origin "$BRANCH" --quiet 2>/dev/null || true

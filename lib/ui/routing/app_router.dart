@@ -9,6 +9,7 @@ import '../screens/auth/sign_in_screen.dart';
 import '../screens/auth/username_screen.dart';
 import '../screens/game/game_screen.dart';
 import '../screens/home/home_screen.dart';
+import '../screens/leaderboard/leaderboard_screen.dart';
 import '../screens/results/game_summary.dart';
 import '../screens/results/results_screen.dart';
 import '../screens/settings/settings_screen.dart';
@@ -24,6 +25,33 @@ class AppRoutes {
   static const signIn = '/sign-in';
   static const username = '/username';
   static const account = '/account';
+  static const leaderboard = '/leaderboard';
+
+  /// Shareable link to one exact puzzle, e.g. /p/hard-4821093.
+  /// The seed *is* the puzzle, so this needs no server lookup and works
+  /// signed out.
+  static const puzzle = '/p';
+}
+
+Difficulty _difficultyFrom(String? name) => Difficulty.values.firstWhere(
+      (d) => d.name == name,
+      orElse: () => Difficulty.easy,
+    );
+
+/// Parses a share code like "hard-4821093". Returns null when the tier is
+/// unknown or the seed isn't an integer, so a mistyped link lands on home
+/// rather than silently starting the wrong puzzle.
+({Difficulty difficulty, int seed})? _parsePuzzleCode(String? code) {
+  if (code == null) return null;
+  final dash = code.lastIndexOf('-');
+  if (dash <= 0) return null;
+  final tier = code.substring(0, dash);
+  final seed = int.tryParse(code.substring(dash + 1));
+  if (seed == null) return null;
+  final match =
+      Difficulty.values.where((d) => d.name == tier).firstOrNull;
+  if (match == null) return null;
+  return (difficulty: match, seed: seed);
 }
 
 /// Re-runs the router's redirect whenever auth or profile state changes.
@@ -83,12 +111,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '${AppRoutes.game}/:difficulty',
         builder: (context, state) {
-          final difficulty = Difficulty.values.firstWhere(
-            (d) => d.name == state.pathParameters['difficulty'],
-            orElse: () => Difficulty.easy,
-          );
+          final difficulty = _difficultyFrom(state.pathParameters['difficulty']);
           final daily = state.uri.queryParameters['daily'] == 'true';
-          return GameScreen(difficulty: difficulty, daily: daily);
+          final seed = int.tryParse(state.uri.queryParameters['seed'] ?? '');
+          return GameScreen(
+            difficulty: difficulty,
+            daily: daily,
+            seed: seed,
+          );
         },
       ),
       GoRoute(
@@ -115,6 +145,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.account,
         builder: (context, state) => const AccountScreen(),
+      ),
+      GoRoute(
+        path: '${AppRoutes.leaderboard}/:difficulty/:seed',
+        builder: (context, state) {
+          final difficulty = _difficultyFrom(state.pathParameters['difficulty']);
+          final seed = int.tryParse(state.pathParameters['seed'] ?? '') ?? 0;
+          return LeaderboardScreen(difficulty: difficulty, seed: seed);
+        },
+      ),
+      GoRoute(
+        // /p/hard-4821093 -- opens that exact puzzle for anyone with the link.
+        // Builds the game directly rather than redirecting: a redirect-only
+        // GoRoute doesn't register as a match, so shared links 404'd.
+        path: '${AppRoutes.puzzle}/:code',
+        redirect: (context, state) =>
+            _parsePuzzleCode(state.pathParameters['code']) == null
+                ? AppRoutes.home
+                : null,
+        builder: (context, state) {
+          final parsed = _parsePuzzleCode(state.pathParameters['code'])!;
+          return GameScreen(difficulty: parsed.difficulty, seed: parsed.seed);
+        },
       ),
     ],
   );

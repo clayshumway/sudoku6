@@ -6,8 +6,11 @@ import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../config/supabase_config.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/repositories/profile_repository.dart';
+import '../data/repositories/solves_repository.dart';
 import '../data/repositories/supabase_auth_repository.dart';
 import '../data/repositories/supabase_profile_repository.dart';
+import '../data/repositories/supabase_solves_repository.dart';
+import '../engine/models/difficulty.dart';
 
 /// Null when Supabase isn't configured, which is what keeps the app fully
 /// playable offline: every social surface checks this and hides itself rather
@@ -25,6 +28,21 @@ final authRepositoryProvider = Provider<AuthRepository?>((ref) {
 final profileRepositoryProvider = Provider<ProfileRepository?>((ref) {
   final client = ref.watch(supabaseClientProvider);
   return client == null ? null : SupabaseProfileRepository(client);
+});
+
+final solvesRepositoryProvider = Provider<SolvesRepository?>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  return client == null ? null : SupabaseSolvesRepository(client);
+});
+
+/// Everyone's times on one specific puzzle. Public -- readable signed out, so
+/// a shared challenge link shows standings before you make an account.
+final leaderboardProvider = FutureProvider.autoDispose
+    .family<List<LeaderboardEntry>, ({Difficulty difficulty, int seed})>(
+        (ref, key) async {
+  final repo = ref.watch(solvesRepositoryProvider);
+  if (repo == null) return const [];
+  return repo.leaderboard(difficulty: key.difficulty, seed: key.seed);
 });
 
 /// Current user, refreshed on sign-in/sign-out/token refresh.

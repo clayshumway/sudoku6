@@ -21,6 +21,9 @@ class _FakePuzzleRepository implements PuzzleRepository {
   Future<Puzzle> dailyPuzzle(Difficulty difficulty, DateTime date) async => puzzle;
 
   @override
+  Future<Puzzle> puzzleForSeed(Difficulty difficulty, int seed) async => puzzle;
+
+  @override
   Future<void> saveInProgress(GameSaveData data) async {}
 
   @override

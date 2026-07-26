@@ -43,6 +43,11 @@ class LocalPuzzleRepository implements PuzzleRepository {
   }
 
   @override
+  Future<Puzzle> puzzleForSeed(Difficulty difficulty, int seed) {
+    return compute(_generateInIsolate, _GenerateArgs(difficulty, seed));
+  }
+
+  @override
   Future<void> saveInProgress(GameSaveData data) async {
     final hive = PuzzleStateHive(
       difficulty: data.puzzle.difficulty.name,
