@@ -65,6 +65,10 @@ enum SignInStep {
 
   /// Verifying the entered code.
   verifying,
+
+  /// Verified. Holds a brief progress state while the profile loads and the
+  /// router moves on, so the screen is never stuck with no explanation.
+  done,
 }
 
 class SignInState {
@@ -101,7 +105,9 @@ class SignInState {
   }
 
   bool get busy =>
-      step == SignInStep.sending || step == SignInStep.verifying;
+      step == SignInStep.sending ||
+      step == SignInStep.verifying ||
+      step == SignInStep.done;
 
   bool get canSend => !busy && cooldownSeconds == 0;
 }
@@ -168,8 +174,19 @@ class SignInController extends Notifier<SignInState> {
     state = state.copyWith(step: SignInStep.verifying);
     try {
       await repo.verifySignInCode(email: state.email, code: code);
-      // Success: the auth stream fires and the router redirect takes over.
+
+      // The router redirect holds on /sign-in while the profile is loading,
+      // so wait for it to resolve here rather than handing off mid-flight --
+      // otherwise a successful sign-in leaves the spinner up indefinitely
+      // with the session already created server-side.
       ref.invalidate(myProfileProvider);
+      try {
+        await ref.read(myProfileProvider.future);
+      } catch (_) {
+        // A failed profile lookup shouldn't strand a verified user; the
+        // redirect treats "no profile" as "needs a username".
+      }
+      state = state.copyWith(step: SignInStep.done);
     } on AuthException catch (_) {
       // Supabase's raw message here is vague ("Token has expired or is
       // invalid"); say the two things the user can actually act on.

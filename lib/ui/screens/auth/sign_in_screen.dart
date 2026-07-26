@@ -12,15 +12,50 @@ class SignInScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(signInControllerProvider);
 
+    final Widget body;
+    switch (state.step) {
+      case SignInStep.email:
+      case SignInStep.sending:
+        body = const _EmailStep();
+      case SignInStep.codeSent:
+      case SignInStep.verifying:
+        body = const _CodeStep();
+      case SignInStep.done:
+        body = const _DoneStep();
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Sign in')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: state.step == SignInStep.email ||
-                state.step == SignInStep.sending
-            ? const _EmailStep()
-            : const _CodeStep(),
-      ),
+      body: Padding(padding: const EdgeInsets.all(24), child: body),
+    );
+  }
+}
+
+/// Shown between a verified code and the router settling on the next screen.
+/// Deliberately says the sign-in worked: the session already exists at this
+/// point, so a bare spinner would misrepresent a success as a hang.
+class _DoneStep extends StatelessWidget {
+  const _DoneStep();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.check_circle_outline, size: 48, color: palette.primary),
+        const SizedBox(height: 16),
+        Text('Signed in', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 12),
+        const SizedBox(
+          height: 18,
+          width: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        const SizedBox(height: 12),
+        Text('Setting up your account…',
+            style: TextStyle(color: palette.noteText)),
+      ],
     );
   }
 }
