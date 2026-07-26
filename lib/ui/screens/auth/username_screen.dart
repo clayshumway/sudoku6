@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../data/repositories/profile_repository.dart';
 import '../../../state/auth_provider.dart';
+import '../../routing/app_router.dart';
 import '../../theme/palette.dart';
 
 /// Shown once, after a user signs in without having claimed a username.
@@ -80,8 +82,22 @@ class _UsernameScreenState extends ConsumerState<UsernameScreen> {
 
     try {
       await repo.claimUsername(value);
+
+      // Wait for the profile to actually reflect the new username before
+      // moving on -- the router redirect holds while it's loading, so handing
+      // off mid-flight leaves the button spinning on a claim that succeeded.
       ref.invalidate(myProfileProvider);
-      // The router redirect takes over once the profile exists.
+      try {
+        await ref.read(myProfileProvider.future);
+      } catch (_) {
+        // The username is claimed either way; don't block on a read-back.
+      }
+
+      if (!mounted) return;
+      // Navigate explicitly rather than waiting for the redirect to fire.
+      // The redirect still runs on this navigation and will keep us here,
+      // so this is a hand-off, not a bypass.
+      context.go(AppRoutes.account);
     } on UsernameTakenException {
       if (!mounted) return;
       setState(() {

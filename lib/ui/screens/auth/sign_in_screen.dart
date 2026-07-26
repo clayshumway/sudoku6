@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../state/auth_provider.dart';
+import '../../routing/app_router.dart';
 import '../../theme/palette.dart';
 
 class SignInScreen extends ConsumerWidget {
@@ -10,6 +12,17 @@ class SignInScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Drive navigation off the verified state directly instead of waiting on
+    // the router's refresh listener, which has proven an unreliable hand-off.
+    // The redirect still runs on this navigation and decides between the
+    // username and account screens, so this doesn't bypass it.
+    ref.listen(signInControllerProvider, (prev, next) {
+      if (next.step == SignInStep.done && prev?.step != SignInStep.done) {
+        final hasUsername = ref.read(myProfileProvider).value != null;
+        context.go(hasUsername ? AppRoutes.account : AppRoutes.username);
+      }
+    });
+
     final state = ref.watch(signInControllerProvider);
 
     final Widget body;
