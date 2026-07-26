@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../engine/models/difficulty.dart';
+import '../../../state/competition_provider.dart';
 import '../../../state/game_controller.dart';
 import '../../../utils/difficulty_label.dart';
 import '../../routing/app_router.dart';
@@ -20,12 +21,21 @@ class GameScreen extends ConsumerStatefulWidget {
   /// Set when arriving from a shared challenge link, pinning the exact puzzle.
   final int? seed;
 
+  /// Set when this is a competition round. Completion then submits through
+  /// the server-timed RPC instead of the normal solo results flow.
+  final String? competitionId;
+  final int? roundNumber;
+
   const GameScreen({
     super.key,
     required this.difficulty,
     this.daily = false,
     this.seed,
+    this.competitionId,
+    this.roundNumber,
   });
+
+  bool get isCompetitionRound => competitionId != null && roundNumber != null;
 
   @override
   ConsumerState<GameScreen> createState() => _GameScreenState();
@@ -47,6 +57,29 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     });
   }
 
+  /// Reports a finished competition round. The elapsed time comes back from
+  /// the server (computed from its own clocks), so nothing here can influence
+  /// the recorded result beyond mistakes and hints.
+  Future<void> _submitCompetitionRound(int mistakes, int hintsUsed) async {
+    final repo = ref.read(competitionRepositoryProvider);
+    final id = widget.competitionId!;
+    try {
+      await repo?.finishRound(
+        competitionId: id,
+        roundNumber: widget.roundNumber!,
+        mistakes: mistakes,
+        hintsUsed: hintsUsed,
+      );
+    } catch (_) {
+      // Fall through to the competition screen either way -- it re-reads
+      // from the server, so a failed submit shows as "not finished" rather
+      // than stranding the player here.
+    }
+    if (!mounted) return;
+    ref.invalidate(competitionViewProvider(id));
+    context.pushReplacement('${AppRoutes.competition}/$id');
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(gameControllerProvider);
@@ -54,6 +87,10 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     ref.listen(gameControllerProvider, (previous, next) {
       final wasComplete = previous?.isComplete ?? false;
       if (next != null && next.isComplete && !wasComplete) {
+        if (widget.isCompetitionRound) {
+          _submitCompetitionRound(next.mistakes, next.hintsUsed);
+          return;
+        }
         final summary = GameSummary(
           difficulty: next.puzzle.difficulty,
           elapsedSeconds: next.elapsedSeconds,

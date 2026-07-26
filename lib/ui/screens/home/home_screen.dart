@@ -43,6 +43,20 @@ class HomeScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (authAvailable) ...[
+            OutlinedButton.icon(
+              onPressed: () => context.push(
+                  signedIn ? AppRoutes.compete : AppRoutes.signIn),
+              icon: const Icon(Icons.groups_outlined, size: 18),
+              label: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Text(signedIn
+                    ? 'Compete with friends'
+                    : 'Sign in to compete'),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
           Text('Choose a difficulty',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),

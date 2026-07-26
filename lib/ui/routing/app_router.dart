@@ -7,6 +7,9 @@ import '../../state/auth_provider.dart';
 import '../screens/auth/account_screen.dart';
 import '../screens/auth/sign_in_screen.dart';
 import '../screens/auth/username_screen.dart';
+import '../screens/compete/compete_screen.dart';
+import '../screens/compete/competition_screen.dart';
+import '../screens/compete/join_competition_screen.dart';
 import '../screens/game/game_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/leaderboard/leaderboard_screen.dart';
@@ -31,6 +34,12 @@ class AppRoutes {
   /// The seed *is* the puzzle, so this needs no server lookup and works
   /// signed out.
   static const puzzle = '/p';
+
+  static const compete = '/compete';
+  static const competition = '/competition';
+
+  /// Invite link, e.g. /c/K3F9QP -- joins then opens the competition.
+  static const joinCode = '/c';
 }
 
 Difficulty _difficultyFrom(String? name) => Difficulty.values.firstWhere(
@@ -112,12 +121,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '${AppRoutes.game}/:difficulty',
         builder: (context, state) {
           final difficulty = _difficultyFrom(state.pathParameters['difficulty']);
-          final daily = state.uri.queryParameters['daily'] == 'true';
-          final seed = int.tryParse(state.uri.queryParameters['seed'] ?? '');
+          final q = state.uri.queryParameters;
           return GameScreen(
             difficulty: difficulty,
-            daily: daily,
-            seed: seed,
+            daily: q['daily'] == 'true',
+            seed: int.tryParse(q['seed'] ?? ''),
+            competitionId: q['competition'],
+            roundNumber: int.tryParse(q['round'] ?? ''),
           );
         },
       ),
@@ -153,6 +163,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           final seed = int.tryParse(state.pathParameters['seed'] ?? '') ?? 0;
           return LeaderboardScreen(difficulty: difficulty, seed: seed);
         },
+      ),
+      GoRoute(
+        path: AppRoutes.compete,
+        builder: (context, state) => const CompeteScreen(),
+      ),
+      GoRoute(
+        path: '${AppRoutes.competition}/:id',
+        builder: (context, state) =>
+            CompetitionScreen(competitionId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        // /c/K3F9QP -- an invite. Joining needs an account, so the redirect
+        // sends signed-out visitors to sign in and they land back here.
+        path: '${AppRoutes.joinCode}/:code',
+        builder: (context, state) =>
+            JoinCompetitionScreen(code: state.pathParameters['code']!),
       ),
       GoRoute(
         // /p/hard-4821093 -- opens that exact puzzle for anyone with the link.
