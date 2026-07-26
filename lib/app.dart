@@ -20,7 +20,7 @@ class SudokuApp extends ConsumerWidget {
       theme: AppTheme.light(scheme),
       darkTheme: AppTheme.dark(scheme),
       themeMode: _toThemeMode(settings.themeMode),
-      routerConfig: appRouter,
+      routerConfig: ref.watch(appRouterProvider),
     );
   }
 

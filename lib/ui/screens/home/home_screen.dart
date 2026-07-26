@@ -1,19 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../engine/models/difficulty.dart';
+import '../../../state/auth_provider.dart';
 import '../../routing/app_router.dart';
 import 'widgets/difficulty_card.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Hidden entirely when Supabase isn't configured, so an offline build
+    // never shows an account button that can't work.
+    final authAvailable = ref.watch(authAvailableProvider);
+    final signedIn = ref.watch(isSignedInProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sudoku 6'),
         actions: [
+          if (authAvailable)
+            IconButton(
+              tooltip: signedIn ? 'Account' : 'Sign in',
+              icon: Icon(signedIn
+                  ? Icons.account_circle
+                  : Icons.account_circle_outlined),
+              onPressed: () => context
+                  .push(signedIn ? AppRoutes.account : AppRoutes.signIn),
+            ),
           IconButton(
             icon: const Icon(Icons.bar_chart_outlined),
             onPressed: () => context.push(AppRoutes.stats),
