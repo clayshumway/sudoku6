@@ -277,6 +277,17 @@ class SupabaseCompetitionRepository implements CompetitionRepository {
   }
 
   @override
+  Future<void> notifyRematch(String rematchCompetitionId) async {
+    try {
+      await _client.functions.invoke('rematch-notify',
+          body: {'competition_id': rematchCompetitionId});
+    } catch (_) {
+      // Best-effort by contract: the in-app banner, history list and the old
+      // invite link are the reliable signals. Email is a bonus.
+    }
+  }
+
+  @override
   Stream<void> watch(String competitionId) {
     final controller = StreamController<void>.broadcast();
     Timer? poll;

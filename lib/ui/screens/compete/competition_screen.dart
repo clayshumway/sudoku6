@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -28,9 +29,10 @@ class _CompetitionScreenState extends ConsumerState<CompetitionScreen> {
   bool _rematching = false;
   String? _error;
 
-  /// Creates the rematch, or joins the one someone else already created --
-  /// both converge on the same new competition, so this is safe to press
-  /// from any player's screen in any order.
+  /// One button, whatever the chain's state: the RPC walks to the newest
+  /// competition in the rematch chain and either hands back the ongoing
+  /// rematch to join or creates a fresh one from the finished tip. join() is
+  /// idempotent, so creator and followers share this path.
   Future<void> _goToRematch(CompetitionView view) async {
     final repo = ref.read(competitionRepositoryProvider);
     if (repo == null) return;
@@ -40,19 +42,12 @@ class _CompetitionScreenState extends ConsumerState<CompetitionScreen> {
       _error = null;
     });
     try {
-      final String code;
-      final existingId = view.competition.rematchId;
-      if (existingId != null) {
-        final existing = await repo.byId(existingId);
-        if (existing == null) {
-          throw const CompetitionException('Could not find the rematch.');
-        }
-        code = existing.code;
-      } else {
-        code = await repo.rematch(widget.competitionId);
-      }
-      // join() is idempotent, so creator and follower share this path.
+      final code = await repo.rematch(widget.competitionId);
       final newId = await repo.join(code);
+      // Fire the invite emails without blocking navigation. Server-side
+      // bookkeeping makes repeat calls no-ops, so this is safe from every
+      // player's button.
+      unawaited(repo.notifyRematch(newId));
       if (!mounted) return;
       context.pushReplacement('${AppRoutes.competition}/$newId');
     } on CompetitionException catch (e) {
@@ -241,7 +236,10 @@ class _Body extends StatelessWidget {
 
         if (c.isComplete) ...[
           _Winner(view: view, myId: myId),
-          if (c.rematchId != null)
+          // Only advertise a rematch while it can still be joined. If the
+          // group already ran it to completion, this player just sees the
+          // normal Rematch button, which starts the next one in the chain.
+          if (view.rematchJoinable)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
@@ -261,16 +259,17 @@ class _Body extends StatelessWidget {
                 : const Icon(Icons.replay, size: 18),
             label: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(c.rematchId != null
+              child: Text(view.rematchJoinable
                   ? 'Join the rematch'
                   : 'Rematch — same settings, new puzzles'),
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            c.rematchId != null
+            view.rematchJoinable
                 ? 'Everyone from this competition can join it.'
-                : 'The old invite link will carry people into the rematch too.',
+                : 'Previous players get an email invite, and the old link '
+                    'carries people in too.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: palette.noteText),
           ),

@@ -140,6 +140,11 @@ abstract class CompetitionRepository {
   /// Competitions the signed-in user has played or is playing, newest first.
   Future<List<Competition>> myCompetitions({int limit = 20});
 
+  /// Fires the "rematch started" email to previous players who haven't
+  /// joined yet. Best-effort: failures are swallowed, because every
+  /// user-visible signal (banner, history, the old link) works without it.
+  Future<void> notifyRematch(String rematchCompetitionId);
+
   /// Emits whenever the competition or its players/results/readiness change.
   /// Implementations must not rely solely on realtime delivery -- see the
   /// Supabase implementation for why.

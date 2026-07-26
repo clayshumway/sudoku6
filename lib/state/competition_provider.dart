@@ -26,6 +26,13 @@ class CompetitionView {
   /// User ids who have pressed Ready for the round after the current one.
   final Set<String> readyNextRound;
 
+  /// The newest competition in this one's rematch chain, if any. Drives the
+  /// "a rematch has started" banner -- which must only appear while that
+  /// rematch is actually joinable. A player looking at an old competition
+  /// whose rematch already ran to completion gets no banner, just the normal
+  /// Rematch button (which extends the chain from its tip).
+  final Competition? rematchTip;
+
   const CompetitionView({
     required this.competition,
     required this.players,
@@ -33,7 +40,11 @@ class CompetitionView {
     required this.round,
     required this.finishedCurrentRound,
     required this.readyNextRound,
+    required this.rematchTip,
   });
+
+  /// True only while there is an ongoing rematch worth pointing people at.
+  bool get rematchJoinable => rematchTip != null && !rematchTip!.isComplete;
 
   bool get canStart => players.length >= 2;
   bool hasFinishedCurrent(String? userId) =>
@@ -94,6 +105,21 @@ final competitionViewProvider =
       } catch (_) {}
     }
 
+    // Follow the rematch chain to its newest member (bounded), degrading to
+    // "no banner" on any failure -- same auxiliary-data rule as above.
+    Competition? rematchTip;
+    if (competition.rematchId != null) {
+      try {
+        var tip = await repo.byId(competition.rematchId!);
+        var hops = 0;
+        while (tip != null && tip.rematchId != null && hops < 20) {
+          tip = await repo.byId(tip.rematchId!);
+          hops++;
+        }
+        rematchTip = tip;
+      } catch (_) {}
+    }
+
     return CompetitionView(
       competition: competition,
       players: players,
@@ -101,6 +127,7 @@ final competitionViewProvider =
       round: round,
       finishedCurrentRound: finished,
       readyNextRound: ready,
+      rematchTip: rematchTip,
     );
   }
 
