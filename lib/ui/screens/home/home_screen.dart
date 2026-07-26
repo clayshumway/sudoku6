@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../engine/models/difficulty.dart';
 import '../../../state/auth_provider.dart';
+import '../../../utils/difficulty_label.dart';
 import '../../routing/app_router.dart';
+import '../../theme/palette.dart';
+import '../../widgets/page_body.dart';
 import 'widgets/difficulty_card.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -40,10 +43,13 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (authAvailable) ...[
+      body: PageBody(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _DailyCard(),
+            const SizedBox(height: 20),
+            if (authAvailable) ...[
             OutlinedButton.icon(
               onPressed: () => context.push(
                   signedIn ? AppRoutes.compete : AppRoutes.signIn),
@@ -65,6 +71,55 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: 12),
           ],
         ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The daily puzzle: same seed for everyone on a given date, tier rotating
+/// with the weekday. The engine has supported deterministic dailies since v1
+/// (`dailySeedFor`), but no entry point ever surfaced it -- it was reachable
+/// only by hand-typing a ?daily=true URL.
+class _DailyCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final now = DateTime.now();
+    // Monday=easy .. Friday=master, weekend wraps back around.
+    final tier = Difficulty.values[(now.weekday - 1) % Difficulty.values.length];
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => context.push('${AppRoutes.game}/${tier.name}?daily=true'),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: palette.primary, width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.today_outlined, color: palette.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Daily Puzzle',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${difficultyLabel(tier)} · everyone gets the same board today',
+                    style: TextStyle(fontSize: 12, color: palette.noteText),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
       ),
     );
   }

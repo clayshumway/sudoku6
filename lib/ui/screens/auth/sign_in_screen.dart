@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../state/auth_provider.dart';
 import '../../routing/app_router.dart';
 import '../../theme/palette.dart';
+import '../../widgets/page_body.dart';
 
 class SignInScreen extends ConsumerWidget {
   const SignInScreen({super.key});
@@ -39,7 +40,9 @@ class SignInScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Sign in')),
-      body: Padding(padding: const EdgeInsets.all(24), child: body),
+      body: PageBody(
+        child: Padding(padding: const EdgeInsets.all(24), child: body),
+      ),
     );
   }
 }
