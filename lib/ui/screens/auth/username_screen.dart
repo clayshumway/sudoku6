@@ -97,7 +97,16 @@ class _UsernameScreenState extends ConsumerState<UsernameScreen> {
       // Navigate explicitly rather than waiting for the redirect to fire.
       // The redirect still runs on this navigation and will keep us here,
       // so this is a hand-off, not a bypass.
-      context.go(AppRoutes.account);
+      //
+      // Pop when this screen was pushed from somewhere specific (an invite
+      // link needs a username before it can join, and should resume where it
+      // left off). Only fall back to the account screen when it's the end of
+      // the first-run sign-in flow with nothing to return to.
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go(AppRoutes.account);
+      }
     } on UsernameTakenException {
       if (!mounted) return;
       setState(() {

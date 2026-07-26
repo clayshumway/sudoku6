@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../engine/models/difficulty.dart';
+import '../../../state/auth_provider.dart';
 import '../../../state/competition_provider.dart';
 import '../../../utils/difficulty_label.dart';
 import '../../routing/app_router.dart';
@@ -31,6 +32,10 @@ class _CompeteScreenState extends ConsumerState<CompeteScreen> {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final state = ref.watch(competeControllerProvider);
+    // Creating also inserts the host as a player, which requires a profile.
+    final profileAsync = ref.watch(myProfileProvider);
+    final needsUsername =
+        !profileAsync.isLoading && profileAsync.value == null;
 
     // Navigate once a create or join lands.
     ref.listen(competeControllerProvider, (prev, next) {
@@ -46,6 +51,37 @@ class _CompeteScreenState extends ConsumerState<CompeteScreen> {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
+          if (needsUsername) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: palette.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: palette.primary),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Pick a username first',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Text(
+                    "It's how you appear in standings.",
+                    style: TextStyle(color: palette.noteText),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () async {
+                      await context.push(AppRoutes.username);
+                      ref.invalidate(myProfileProvider);
+                    },
+                    child: const Text('Choose a username'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
           Text('Start a competition',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -85,7 +121,7 @@ class _CompeteScreenState extends ConsumerState<CompeteScreen> {
           ),
           const SizedBox(height: 12),
           FilledButton(
-            onPressed: state.busy
+            onPressed: state.busy || needsUsername
                 ? null
                 : () => ref.read(competeControllerProvider.notifier).create(
                       difficulty: _difficulty,
@@ -131,7 +167,7 @@ class _CompeteScreenState extends ConsumerState<CompeteScreen> {
           ),
           const SizedBox(height: 12),
           OutlinedButton(
-            onPressed: state.busy || _codeController.text.trim().length < 4
+            onPressed: state.busy || needsUsername || _codeController.text.trim().length < 4
                 ? null
                 : () => ref
                     .read(competeControllerProvider.notifier)
