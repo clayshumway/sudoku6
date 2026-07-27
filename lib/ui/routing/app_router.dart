@@ -12,6 +12,7 @@ import '../screens/compete/competition_screen.dart';
 import '../screens/compete/join_competition_screen.dart';
 import '../screens/game/game_screen.dart';
 import '../screens/home/home_screen.dart';
+import '../screens/leaderboard/global_leaderboard_screen.dart';
 import '../screens/leaderboard/leaderboard_screen.dart';
 import '../screens/results/game_summary.dart';
 import '../screens/results/results_screen.dart';
@@ -29,6 +30,10 @@ class AppRoutes {
   static const username = '/username';
   static const account = '/account';
   static const leaderboard = '/leaderboard';
+
+  /// Aggregate standings across every puzzle, as opposed to the per-puzzle
+  /// board at [leaderboard]/:difficulty/:seed.
+  static const globalLeaderboard = '/leaderboards';
 
   /// Shareable link to one exact puzzle, e.g. /p/hard-4821093.
   /// The seed *is* the puzzle, so this needs no server lookup and works
@@ -155,6 +160,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.account,
         builder: (context, state) => const AccountScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.globalLeaderboard,
+        builder: (context, state) => const GlobalLeaderboardScreen(),
       ),
       GoRoute(
         path: '${AppRoutes.leaderboard}/:difficulty/:seed',
