@@ -105,18 +105,14 @@ final competitionViewProvider =
       } catch (_) {}
     }
 
-    // Follow the rematch chain to its newest member (bounded), degrading to
-    // "no banner" on any failure -- same auxiliary-data rule as above.
+    // Newest competition in the rematch chain, degrading to "no banner" on any
+    // failure -- same auxiliary-data rule as above. The walk happens server
+    // side: competition reads are player-only, and the player this banner
+    // exists for is precisely the one who never joined the rematch.
     Competition? rematchTip;
     if (competition.rematchId != null) {
       try {
-        var tip = await repo.byId(competition.rematchId!);
-        var hops = 0;
-        while (tip != null && tip.rematchId != null && hops < 20) {
-          tip = await repo.byId(tip.rematchId!);
-          hops++;
-        }
-        rematchTip = tip;
+        rematchTip = await repo.chainTip(id);
       } catch (_) {}
     }
 
