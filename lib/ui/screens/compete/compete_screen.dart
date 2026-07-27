@@ -22,6 +22,9 @@ class CompeteScreen extends ConsumerStatefulWidget {
 class _CompeteScreenState extends ConsumerState<CompeteScreen> {
   Difficulty _difficulty = Difficulty.medium;
   int _rounds = 3;
+  // Async by default: friends are rarely free at the same moment, and it's
+  // also the mode with no lobby wait, no ready gate and no host start button.
+  CompetitionMode _mode = CompetitionMode.async;
   final _codeController = TextEditingController();
 
   @override
@@ -89,11 +92,39 @@ class _CompeteScreenState extends ConsumerState<CompeteScreen> {
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(
-            'Everyone plays the same puzzles. Nobody sees a puzzle until the '
-            'round starts.',
+            'Everyone plays the same puzzles. Nobody sees a puzzle until they '
+            'start that round.',
             style: TextStyle(color: palette.noteText, height: 1.4),
           ),
           const SizedBox(height: 20),
+          SegmentedButton<CompetitionMode>(
+            segments: const [
+              ButtonSegment(
+                value: CompetitionMode.async,
+                label: Text('Play anytime'),
+                icon: Icon(Icons.schedule, size: 16),
+              ),
+              ButtonSegment(
+                value: CompetitionMode.sync,
+                label: Text('All together'),
+                icon: Icon(Icons.group, size: 16),
+              ),
+            ],
+            selected: {_mode},
+            onSelectionChanged: state.busy
+                ? null
+                : (s) => setState(() => _mode = s.first),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _mode == CompetitionMode.async
+                ? 'Everyone plays each round whenever they like, on their own '
+                    'clock. Start playing straight away.'
+                : 'Everyone plays each round at the same time. You start each '
+                    'round once the others are ready.',
+            style: TextStyle(fontSize: 12, color: palette.noteText, height: 1.4),
+          ),
+          const SizedBox(height: 12),
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Difficulty'),
@@ -129,6 +160,7 @@ class _CompeteScreenState extends ConsumerState<CompeteScreen> {
                 : () => ref.read(competeControllerProvider.notifier).create(
                       difficulty: _difficulty,
                       rounds: _rounds,
+                      mode: _mode,
                     ),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -223,8 +255,9 @@ class _CompeteScreenState extends ConsumerState<CompeteScreen> {
 
   String _statusLabel(Competition c) => switch (c.status) {
         CompetitionStatus.lobby => 'waiting for players',
-        CompetitionStatus.active =>
-          'round ${c.currentRound} of ${c.rounds}',
+        CompetitionStatus.active => c.isAsync
+            ? 'in progress · play anytime'
+            : 'round ${c.currentRound} of ${c.rounds}',
         CompetitionStatus.complete =>
           c.rematchId != null ? 'finished · rematch started' : 'finished',
       };

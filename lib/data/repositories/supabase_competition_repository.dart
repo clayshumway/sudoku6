@@ -29,6 +29,11 @@ class SupabaseCompetitionRepository implements CompetitionRepository {
         rounds: r['rounds'] as int,
         currentRound: r['current_round'] as int,
         status: _status(r['status'] as String),
+        // Absent until 0011; anything without the column is a sync
+        // competition, which is exactly what the default gives.
+        mode: r['mode'] == 'async'
+            ? CompetitionMode.async
+            : CompetitionMode.sync,
         createdAt: DateTime.parse(r['created_at'] as String),
         // Absent until migration 0008 has been applied; null-safe either way.
         rematchId: r['rematch_id'] as String?,
@@ -46,11 +51,13 @@ class SupabaseCompetitionRepository implements CompetitionRepository {
   Future<String> create({
     required Difficulty difficulty,
     required int rounds,
+    CompetitionMode mode = CompetitionMode.async,
   }) async {
     try {
-      final code = await _client.rpc('create_competition', params: {
+      final code = await _client.rpc('create_competition_mode', params: {
         'p_tier': difficulty.name,
         'p_rounds': rounds,
+        'p_mode': mode.name,
       });
       return code as String;
     } catch (e) {
@@ -162,6 +169,46 @@ class SupabaseCompetitionRepository implements CompetitionRepository {
       seed: (r['seed'] as num).toInt(),
       startedAt: DateTime.parse(r['started_at'] as String),
     );
+  }
+
+  @override
+  Future<int> startRound({
+    required String competitionId,
+    required int roundNumber,
+  }) async {
+    try {
+      final seed = await _client.rpc('start_round', params: {
+        'p_competition': competitionId,
+        'p_round': roundNumber,
+      });
+      return (seed as num).toInt();
+    } catch (e) {
+      _rethrow(e);
+    }
+  }
+
+  @override
+  Future<void> closeCompetition(String competitionId) async {
+    try {
+      await _client
+          .rpc('close_competition', params: {'p_competition': competitionId});
+    } catch (e) {
+      _rethrow(e);
+    }
+  }
+
+  @override
+  Future<Set<int>> myFinishedRounds(String competitionId) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return const {};
+    final rows = await _client
+        .from('competition_results')
+        .select('round_number')
+        .eq('competition_id', competitionId)
+        .eq('user_id', uid);
+    return (rows as List)
+        .map((r) => (r['round_number'] as num).toInt())
+        .toSet();
   }
 
   @override
@@ -341,6 +388,19 @@ class SupabaseCompetitionRepository implements CompetitionRepository {
           event: sb.PostgresChangeEvent.all,
           schema: 'public',
           table: 'competition_ready',
+          filter: sb.PostgresChangeFilter(
+            type: sb.PostgresChangeFilterType.eq,
+            column: 'competition_id',
+            value: competitionId,
+          ),
+          callback: (_) => controller.add(null),
+        )
+        // Async: someone opening a round is the signal that they're playing,
+        // and there's no shared round pointer to notice it any other way.
+        .onPostgresChanges(
+          event: sb.PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'competition_attempts',
           filter: sb.PostgresChangeFilter(
             type: sb.PostgresChangeFilterType.eq,
             column: 'competition_id',
