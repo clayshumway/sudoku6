@@ -91,4 +91,63 @@ class SupabaseSolvesRepository implements SolvesRepository {
         .nonNulls
         .toList();
   }
+
+  @override
+  Future<List<GlobalLeaderboardEntry>> globalLeaderboard({
+    Difficulty? difficulty,
+    LeaderboardSort sort = LeaderboardSort.bestTime,
+    int minSolves = 1,
+    int limit = 50,
+  }) async {
+    // The view joins profiles itself, so this needs none of the two-query
+    // name resolution the per-puzzle board does -- the join happens in the
+    // database, where PostgREST's missing FK path is irrelevant.
+    var query = _client.from('global_leaderboard').select();
+
+    // The rollup rows carry a null tier. Selecting one or the other is what
+    // switches between the per-difficulty and overall boards.
+    query = difficulty == null
+        ? query.isFilter('tier', null)
+        : query.eq('tier', difficulty.name);
+
+    if (minSolves > 1) query = query.gte('solves', minSolves);
+
+    final (column, ascending) = switch (sort) {
+      LeaderboardSort.bestTime => ('best_ms', true),
+      LeaderboardSort.averageTime => ('avg_ms', true),
+      LeaderboardSort.mostSolves => ('solves', false),
+      LeaderboardSort.cleanSolves => ('clean_solves', false),
+    };
+
+    final rows = await query
+        .order(column, ascending: ascending, nullsFirst: false)
+        // Deterministic order for ties, so the board doesn't reshuffle
+        // between reads for players with identical numbers.
+        .order('solves', ascending: false)
+        .order('username', ascending: true)
+        .limit(limit);
+
+    return (rows as List).map((r) {
+      final tier = r['tier'] as String?;
+      return GlobalLeaderboardEntry(
+        userId: r['user_id'] as String,
+        username: r['username'] as String,
+        difficulty: tier == null ? null : _tier(tier),
+        solves: (r['solves'] as num).toInt(),
+        cleanSolves: (r['clean_solves'] as num?)?.toInt() ?? 0,
+        bestMs: (r['best_ms'] as num?)?.toInt(),
+        averageMs: (r['avg_ms'] as num?)?.toInt(),
+        totalMistakes: (r['total_mistakes'] as num?)?.toInt() ?? 0,
+        totalHints: (r['total_hints'] as num?)?.toInt() ?? 0,
+        lastSolveAt: r['last_solve_at'] == null
+            ? null
+            : DateTime.parse(r['last_solve_at'] as String),
+      );
+    }).toList();
+  }
+
+  Difficulty _tier(String name) => Difficulty.values.firstWhere(
+        (d) => d.name == name,
+        orElse: () => Difficulty.easy,
+      );
 }

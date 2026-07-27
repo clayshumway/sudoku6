@@ -33,7 +33,14 @@ class HomeScreen extends ConsumerWidget {
               onPressed: () => context
                   .push(signedIn ? AppRoutes.account : AppRoutes.signIn),
             ),
+          if (authAvailable)
+            IconButton(
+              tooltip: 'Leaderboard',
+              icon: const Icon(Icons.emoji_events_outlined),
+              onPressed: () => context.push(AppRoutes.globalLeaderboard),
+            ),
           IconButton(
+            tooltip: 'Your stats',
             icon: const Icon(Icons.bar_chart_outlined),
             onPressed: () => context.push(AppRoutes.stats),
           ),

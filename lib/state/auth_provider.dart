@@ -45,6 +45,21 @@ final leaderboardProvider = FutureProvider.autoDispose
   return repo.leaderboard(difficulty: key.difficulty, seed: key.seed);
 });
 
+/// Aggregate standings across all puzzles. Difficulty null = all difficulties,
+/// which the time-based sorts don't apply to.
+final globalLeaderboardProvider = FutureProvider.autoDispose.family<
+    List<GlobalLeaderboardEntry>,
+    ({Difficulty? difficulty, LeaderboardSort sort})>((ref, key) async {
+  final repo = ref.watch(solvesRepositoryProvider);
+  if (repo == null) return const [];
+  return repo.globalLeaderboard(
+    difficulty: key.difficulty,
+    sort: key.sort,
+    // One fluke fast solve shouldn't top an average-time board.
+    minSolves: key.sort == LeaderboardSort.averageTime ? 3 : 1,
+  );
+});
+
 /// Current user, refreshed on sign-in/sign-out/token refresh.
 final authUserProvider = StreamProvider<AuthUser?>((ref) {
   final repo = ref.watch(authRepositoryProvider);
