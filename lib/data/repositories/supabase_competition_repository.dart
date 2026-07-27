@@ -188,6 +188,36 @@ class SupabaseCompetitionRepository implements CompetitionRepository {
   }
 
   @override
+  Future<void> pauseRound({
+    required String competitionId,
+    required int roundNumber,
+  }) async {
+    try {
+      await _client.rpc('pause_round', params: {
+        'p_competition': competitionId,
+        'p_round': roundNumber,
+      });
+    } catch (e) {
+      _rethrow(e);
+    }
+  }
+
+  @override
+  Future<void> resumeRound({
+    required String competitionId,
+    required int roundNumber,
+  }) async {
+    try {
+      await _client.rpc('resume_round', params: {
+        'p_competition': competitionId,
+        'p_round': roundNumber,
+      });
+    } catch (e) {
+      _rethrow(e);
+    }
+  }
+
+  @override
   Future<void> closeCompetition(String competitionId) async {
     try {
       await _client

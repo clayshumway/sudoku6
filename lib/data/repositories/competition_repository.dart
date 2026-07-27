@@ -137,6 +137,21 @@ abstract class CompetitionRepository {
     required int roundNumber,
   });
 
+  /// Pauses/resumes the caller's clock for a round.
+  ///
+  /// Required because competition times are computed from server clocks: a
+  /// pause that only stopped the on-screen timer would leave the recorded
+  /// time climbing behind a frozen display. Both are safe to call twice.
+  Future<void> pauseRound({
+    required String competitionId,
+    required int roundNumber,
+  });
+
+  Future<void> resumeRound({
+    required String competitionId,
+    required int roundNumber,
+  });
+
   /// Async only, host only. Ends a competition that still has unplayed rounds
   /// -- the way out when someone joins and never plays.
   Future<void> closeCompetition(String competitionId);

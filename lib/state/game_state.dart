@@ -14,6 +14,10 @@ class GameState {
   final SolveStep? activeHint;
   final Set<int> incorrectCells;
 
+  /// Stops the clock and hides the board. Not persisted: a game reopened from
+  /// a save starts running, since a pause you can't see isn't a pause.
+  final bool isPaused;
+
   const GameState({
     required this.puzzle,
     required this.values,
@@ -26,6 +30,7 @@ class GameState {
     this.notesMode = false,
     this.activeHint,
     this.incorrectCells = const {},
+    this.isPaused = false,
   });
 
   bool get isComplete {
@@ -72,6 +77,7 @@ class GameState {
     SolveStep? activeHint,
     bool clearActiveHint = false,
     Set<int>? incorrectCells,
+    bool? isPaused,
   }) {
     return GameState(
       puzzle: puzzle,
@@ -86,6 +92,7 @@ class GameState {
       notesMode: notesMode ?? this.notesMode,
       activeHint: clearActiveHint ? null : (activeHint ?? this.activeHint),
       incorrectCells: incorrectCells ?? this.incorrectCells,
+      isPaused: isPaused ?? this.isPaused,
     );
   }
 }
