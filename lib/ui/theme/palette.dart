@@ -8,12 +8,22 @@ import 'package:flutter/material.dart';
 /// Specifying the end color directly gives each scheme exact control, and is
 /// what makes a high-saturation neon look possible at all.
 ///
-/// Scheme design rule, learned the hard way: themes that differ only in
-/// digit saturation on the same near-black background all read as the same
-/// theme. Every scheme here commits to its own background hue, its own seam
-/// color, and its own digit strategy (neon, CRT-bright, bioluminescent,
-/// fire-and-ash, pastel-on-ink...), so switching schemes visibly changes the
-/// whole game, not just the six squares.
+/// Scheme design rule, learned twice: themes that differ only in digit
+/// saturation on the same near-black background all read as the same theme.
+/// The second lesson was subtler -- keeping 1=yellow, 2=red ... 6=orange in
+/// every scheme meant even schemes with distinct backgrounds were still the
+/// same palette wearing a different jacket. **The digit-to-hue mapping is per
+/// scheme, not global.** v1's mapping survives only in Retro-Futuristic and
+/// Classic; everything else picks its own color *system* -- a luminance ramp,
+/// a graphic primary set, a thermal gradient.
+///
+/// The two things a scheme may not trade away: six fills a player can tell
+/// apart at a glance, and text that clears ~4.0 contrast on its own fill.
+///
+/// Note that the Wordle-style share text stays on v1's emoji mapping
+/// regardless of scheme (see utils/share_text.dart). It is read by people who
+/// may be on another theme entirely, so it has to be fixed notation rather
+/// than a mirror of the sender's board.
 @immutable
 class Palette {
   final Color background;
@@ -92,7 +102,9 @@ class PaletteScheme {
 }
 
 // ---------------------------------------------------------------------------
-// Retro-Futuristic (default) -- synthwave / outrun
+// Retro-Futuristic (default) -- synthwave / outrun.
+// The one scheme that keeps v1's digit-to-hue mapping, because it is the
+// mapping: neon yellow/red/blue/green/purple/orange is the look.
 // ---------------------------------------------------------------------------
 
 const _retroDark = Palette(
@@ -164,215 +176,76 @@ const _retroLight = Palette(
 );
 
 // ---------------------------------------------------------------------------
-// Terminal (id 'modern') -- phosphor CRT on pure black
+// Slate (id 'modern') -- monochrome, digits read by weight.
+//
+// Six steps of one cool grey instead of six hues. Besides being the most
+// literally "modern" of the set, encoding digits by luminance rather than hue
+// is the only scheme here that survives red-green color blindness intact --
+// the retro palette's 2/4 pair is exactly the hard case.
 // ---------------------------------------------------------------------------
 
-const _terminalDark = Palette(
-  background: Color(0xFF000000),
-  surface: Color(0xFF0A120A),
-  gridLine: Color(0xFF1C2E1C),
-  boxLine: Color(0xFF33FF66),
-  givenText: Color(0xFFD6FFD6),
-  userText: Color(0xFF33FF66),
-  noteText: Color(0xFF5E9A6C),
-  errorText: Color(0xFFFF5252),
-  errorCell: Color(0xFF2E0D0D),
-  selectedCell: Color(0xFF123A1E),
-  peerCell: Color(0xFF0A1F0E),
-  selectionRing: Color(0xFF33FF66),
-  peerScrim: Color(0x2033FF66),
-  primary: Color(0xFF33FF66),
-  hintCell: Color(0xFF153D22),
-  digitFills: {
-    1: Color(0xFFFFD400),
-    2: Color(0xFFFF4747),
-    3: Color(0xFF35CCFF),
-    4: Color(0xFF33FF66),
-    5: Color(0xFFCC66FF),
-    6: Color(0xFFFF9933),
-  },
-  digitTextColors: {
-    1: Color(0xFF201700),
-    2: Color(0xFF2A0303),
-    3: Color(0xFF03202E),
-    4: Color(0xFF002211),
-    5: Color(0xFF24063A),
-    6: Color(0xFF251200),
-  },
-);
-
-const _terminalLight = Palette(
-  background: Color(0xFFEAF2EA),
-  surface: Color(0xFFF8FCF8),
-  gridLine: Color(0xFFC7D8C7),
-  boxLine: Color(0xFF1B5E20),
-  givenText: Color(0xFF0F2911),
-  userText: Color(0xFF1B5E20),
-  noteText: Color(0xFF6C846C),
-  errorText: Color(0xFFC62828),
-  errorCell: Color(0xFFF5DBDB),
-  selectedCell: Color(0xFFCFE8CF),
-  peerCell: Color(0xFFDFEDDF),
-  selectionRing: Color(0xFF1B5E20),
-  peerScrim: Color(0x14000000),
-  primary: Color(0xFF1B5E20),
-  hintCell: Color(0xFFC9E6C9),
-  digitFills: {
-    1: Color(0xFFE6A800),
-    2: Color(0xFFC62828),
-    3: Color(0xFF1565C0),
-    4: Color(0xFF2E7D32),
-    5: Color(0xFF6A1B9A),
-    6: Color(0xFFE65100),
-  },
-  digitTextColors: {
-    1: Color(0xFF231A00),
-    2: Color(0xFFFFFFFF),
-    3: Color(0xFFFFFFFF),
-    4: Color(0xFFFFFFFF),
-    5: Color(0xFFFFFFFF),
-    6: Color(0xFF2E1300),
-  },
-);
-
-// ---------------------------------------------------------------------------
-// Deep Sea (id 'postmodern') -- bioluminescence in dark water
-// ---------------------------------------------------------------------------
-
-const _deepSeaDark = Palette(
-  background: Color(0xFF041B26),
-  surface: Color(0xFF0A2836),
-  gridLine: Color(0xFF14404F),
-  boxLine: Color(0xFF4DD0E1),
-  givenText: Color(0xFFE0F7FA),
-  userText: Color(0xFF4DD0E1),
-  noteText: Color(0xFF6FA3B0),
-  errorText: Color(0xFFFF7043),
-  errorCell: Color(0xFF3B1A10),
-  selectedCell: Color(0xFF14506A),
-  peerCell: Color(0xFF0D3140),
-  selectionRing: Color(0xFF4DD0E1),
+const _slateDark = Palette(
+  background: Color(0xFF07090C),
+  surface: Color(0xFF10161D),
+  gridLine: Color(0xFF1C2630),
+  boxLine: Color(0xFF7C8FA3),
+  givenText: Color(0xFFE6EDF3),
+  userText: Color(0xFF9FB4C8),
+  noteText: Color(0xFF6B7C8C),
+  errorText: Color(0xFFF87171),
+  errorCell: Color(0xFF3A1D1D),
+  selectedCell: Color(0xFF1E2C38),
+  peerCell: Color(0xFF141C24),
+  selectionRing: Color(0xFF9FB4C8),
   peerScrim: Color(0x1FFFFFFF),
-  primary: Color(0xFF26C6DA),
-  hintCell: Color(0xFF0F4C5C),
+  primary: Color(0xFF94A3B8),
+  hintCell: Color(0xFF24333F),
   digitFills: {
-    1: Color(0xFFFFD54F),
-    2: Color(0xFFFF6B6B),
-    3: Color(0xFF29B6F6),
-    4: Color(0xFF26A69A),
-    5: Color(0xFF9575CD),
-    6: Color(0xFFFFA726),
+    1: Color(0xFFF1F5F9),
+    2: Color(0xFFC7D2DC),
+    3: Color(0xFF9AAAB8),
+    4: Color(0xFF5D7286),
+    5: Color(0xFF40525F),
+    6: Color(0xFF1F2C36),
   },
   digitTextColors: {
-    1: Color(0xFF241B00),
-    2: Color(0xFF330808),
-    3: Color(0xFF032235),
-    4: Color(0xFF00201C),
-    5: Color(0xFF1E1240),
-    6: Color(0xFF241300),
+    1: Color(0xFF0B1117),
+    2: Color(0xFF0B1117),
+    3: Color(0xFF0B1117),
+    4: Color(0xFFEAF0F6),
+    5: Color(0xFFEAF0F6),
+    6: Color(0xFFEAF0F6),
   },
 );
 
-const _deepSeaLight = Palette(
-  background: Color(0xFFE3F1F5),
-  surface: Color(0xFFF4FAFC),
-  gridLine: Color(0xFFBFDBE2),
-  boxLine: Color(0xFF0E4A5C),
-  givenText: Color(0xFF0B2E38),
-  userText: Color(0xFF00838F),
-  noteText: Color(0xFF5E858F),
-  errorText: Color(0xFFD84315),
-  errorCell: Color(0xFFF8DCD2),
-  selectedCell: Color(0xFFC2E5EC),
-  peerCell: Color(0xFFD8EBF0),
-  selectionRing: Color(0xFF00838F),
+const _slateLight = Palette(
+  background: Color(0xFFF7F9FB),
+  surface: Color(0xFFFFFFFF),
+  gridLine: Color(0xFFD8E0E8),
+  boxLine: Color(0xFF55677A),
+  givenText: Color(0xFF1B2733),
+  userText: Color(0xFF3F5568),
+  noteText: Color(0xFF7C8B9A),
+  errorText: Color(0xFFC0392B),
+  errorCell: Color(0xFFFBE4E1),
+  selectedCell: Color(0xFFDDE6EE),
+  peerCell: Color(0xFFEEF3F7),
+  selectionRing: Color(0xFF3F5568),
   peerScrim: Color(0x14000000),
-  primary: Color(0xFF00838F),
-  hintCell: Color(0xFFBCE2E9),
+  primary: Color(0xFF47586B),
+  hintCell: Color(0xFFD2DEE9),
   digitFills: {
-    1: Color(0xFFF0B90B),
-    2: Color(0xFFE4584B),
-    3: Color(0xFF1976D2),
-    4: Color(0xFF00897B),
-    5: Color(0xFF7E57C2),
-    6: Color(0xFFF57C00),
+    1: Color(0xFFD7E0E9),
+    2: Color(0xFFB3C1CE),
+    3: Color(0xFF8E9FB0),
+    4: Color(0xFF6A7C8E),
+    5: Color(0xFF4A5A6B),
+    6: Color(0xFF2B3A49),
   },
   digitTextColors: {
-    1: Color(0xFF231B00),
-    2: Color(0xFF330B05),
-    3: Color(0xFFFFFFFF),
-    4: Color(0xFFFFFFFF),
-    5: Color(0xFFFFFFFF),
-    6: Color(0xFF2A1500),
-  },
-);
-
-// ---------------------------------------------------------------------------
-// Ember (id 'apocalyptic') -- fire and ash on charred ground
-// ---------------------------------------------------------------------------
-
-const _emberDark = Palette(
-  background: Color(0xFF150A04),
-  surface: Color(0xFF241108),
-  gridLine: Color(0xFF40250F),
-  boxLine: Color(0xFFFF6D00),
-  givenText: Color(0xFFFFE9D6),
-  userText: Color(0xFFFFB74D),
-  noteText: Color(0xFFA98A70),
-  errorText: Color(0xFFFF5252),
-  errorCell: Color(0xFF3D1512),
-  selectedCell: Color(0xFF4A2410),
-  peerCell: Color(0xFF2E1809),
-  selectionRing: Color(0xFFFFB74D),
-  peerScrim: Color(0x1FFFFFFF),
-  primary: Color(0xFFFF6D00),
-  hintCell: Color(0xFF45300F),
-  digitFills: {
-    1: Color(0xFFFFC400),
-    2: Color(0xFFE5322E),
-    3: Color(0xFF41616F),
-    4: Color(0xFFAEEA00),
-    5: Color(0xFF6D4C7D),
-    6: Color(0xFFFF8F00),
-  },
-  digitTextColors: {
-    1: Color(0xFF241A00),
-    2: Color(0xFF310404),
-    3: Color(0xFFEDF5F8),
-    4: Color(0xFF1C2600),
-    5: Color(0xFFF4EAF8),
-    6: Color(0xFF251300),
-  },
-);
-
-const _emberLight = Palette(
-  background: Color(0xFFF2E2C4),
-  surface: Color(0xFFFAF0DC),
-  gridLine: Color(0xFFD9C098),
-  boxLine: Color(0xFF7A2E0E),
-  givenText: Color(0xFF33200E),
-  userText: Color(0xFFB23A12),
-  noteText: Color(0xFF927554),
-  errorText: Color(0xFFB3261E),
-  errorCell: Color(0xFFF2D4CE),
-  selectedCell: Color(0xFFEACF98),
-  peerCell: Color(0xFFEDDDB9),
-  selectionRing: Color(0xFF7A2E0E),
-  peerScrim: Color(0x14000000),
-  primary: Color(0xFFB23A12),
-  hintCell: Color(0xFFE2D08F),
-  digitFills: {
-    1: Color(0xFFD99A06),
-    2: Color(0xFFB3261E),
-    3: Color(0xFF3E6273),
-    4: Color(0xFF5F7317),
-    5: Color(0xFF6D4C7D),
-    6: Color(0xFFC05B0D),
-  },
-  digitTextColors: {
-    1: Color(0xFF2A1D00),
-    2: Color(0xFFFFFFFF),
-    3: Color(0xFFFFFFFF),
+    1: Color(0xFF1F2933),
+    2: Color(0xFF1F2933),
+    3: Color(0xFF0F1720),
     4: Color(0xFFFFFFFF),
     5: Color(0xFFFFFFFF),
     6: Color(0xFFFFFFFF),
@@ -380,77 +253,305 @@ const _emberLight = Palette(
 );
 
 // ---------------------------------------------------------------------------
-// Blossom (id 'blossom') -- pastel petals by day, plum night after dark
+// Bauhaus (id 'postmodern') -- graphic primaries, heavy black rules.
+//
+// A poster rather than a screen: flat primaries on bone paper, with the box
+// seams doing the work a black keyline does in Swiss layout. Replaces Deep
+// Sea, which was distinct in mood but still ran v1's six hues underneath.
 // ---------------------------------------------------------------------------
 
-const _blossomLight = Palette(
-  background: Color(0xFFFFF4F7),
-  surface: Color(0xFFFFFFFF),
-  gridLine: Color(0xFFF0D5DD),
-  boxLine: Color(0xFFAD1457),
-  givenText: Color(0xFF3A1B27),
-  userText: Color(0xFFC2185B),
-  noteText: Color(0xFFA88793),
-  errorText: Color(0xFFC62828),
-  errorCell: Color(0xFFFBE0E0),
-  selectedCell: Color(0xFFFBD9E4),
-  peerCell: Color(0xFFFBEEF2),
-  selectionRing: Color(0xFFC2185B),
+const _bauhausLight = Palette(
+  background: Color(0xFFF2EFE6),
+  surface: Color(0xFFFBF9F3),
+  gridLine: Color(0xFFDCD7C8),
+  boxLine: Color(0xFF111111),
+  givenText: Color(0xFF14140F),
+  userText: Color(0xFFD1372B),
+  noteText: Color(0xFF8A8578),
+  errorText: Color(0xFFD1372B),
+  errorCell: Color(0xFFF7DDD9),
+  selectedCell: Color(0xFFFFE9A8),
+  peerCell: Color(0xFFEAE6D9),
+  selectionRing: Color(0xFF111111),
   peerScrim: Color(0x14000000),
-  primary: Color(0xFFEC407A),
-  hintCell: Color(0xFFF7CFDE),
+  primary: Color(0xFFD1372B),
+  hintCell: Color(0xFFFFE0A0),
   digitFills: {
-    1: Color(0xFFFFE082),
-    2: Color(0xFFF48FB1),
-    3: Color(0xFF90CAF9),
-    4: Color(0xFFA5D6A7),
-    5: Color(0xFFCE93D8),
-    6: Color(0xFFFFCC80),
+    1: Color(0xFFF2B705),
+    2: Color(0xFFD1372B),
+    3: Color(0xFF1E4C8A),
+    4: Color(0xFF2E8B6F),
+    5: Color(0xFF1A1A1A),
+    6: Color(0xFFE2714C),
   },
   digitTextColors: {
-    1: Color(0xFF2E2200),
-    2: Color(0xFF3A0E1E),
-    3: Color(0xFF0A2A45),
-    4: Color(0xFF123A16),
-    5: Color(0xFF2E0E38),
-    6: Color(0xFF331A00),
+    1: Color(0xFF1A1400),
+    2: Color(0xFFFFFFFF),
+    3: Color(0xFFFFFFFF),
+    4: Color(0xFFFFFFFF),
+    5: Color(0xFFF2EFE6),
+    6: Color(0xFF23100A),
   },
 );
 
-const _blossomDark = Palette(
-  background: Color(0xFF1C0F1A),
-  surface: Color(0xFF2A1727),
-  gridLine: Color(0xFF45283C),
-  boxLine: Color(0xFFF48FB1),
-  givenText: Color(0xFFFCE4EC),
-  userText: Color(0xFFF48FB1),
-  noteText: Color(0xFFA98598),
-  errorText: Color(0xFFFF6B60),
-  errorCell: Color(0xFF3D1620),
-  selectedCell: Color(0xFF4A2440),
-  peerCell: Color(0xFF341C2F),
-  selectionRing: Color(0xFFF48FB1),
+const _bauhausDark = Palette(
+  background: Color(0xFF121212),
+  surface: Color(0xFF1B1B1B),
+  gridLine: Color(0xFF2E2E2E),
+  boxLine: Color(0xFFF2EFE6),
+  givenText: Color(0xFFF2EFE6),
+  userText: Color(0xFFFFC629),
+  noteText: Color(0xFF8A8578),
+  errorText: Color(0xFFE03A22),
+  errorCell: Color(0xFF3A1410),
+  selectedCell: Color(0xFF33301F),
+  peerCell: Color(0xFF202020),
+  selectionRing: Color(0xFFF2EFE6),
   peerScrim: Color(0x1FFFFFFF),
-  primary: Color(0xFFF06292),
-  hintCell: Color(0xFF45213A),
-  // Pastels carry to the dark variant on purpose: soft fills on deep plum is
-  // the scheme's identity, and the same paired ink texts stay readable on
-  // both brightnesses.
+  primary: Color(0xFFFFC629),
+  hintCell: Color(0xFF3D3820),
   digitFills: {
-    1: Color(0xFFFFE082),
-    2: Color(0xFFF48FB1),
-    3: Color(0xFF90CAF9),
-    4: Color(0xFFA5D6A7),
-    5: Color(0xFFCE93D8),
-    6: Color(0xFFFFCC80),
+    1: Color(0xFFFFC629),
+    2: Color(0xFFE03A22),
+    3: Color(0xFF2C6BC4),
+    4: Color(0xFF35A67F),
+    5: Color(0xFFF2EFE6),
+    6: Color(0xFFF58A5B),
   },
   digitTextColors: {
-    1: Color(0xFF2E2200),
-    2: Color(0xFF3A0E1E),
-    3: Color(0xFF0A2A45),
-    4: Color(0xFF123A16),
-    5: Color(0xFF2E0E38),
-    6: Color(0xFF331A00),
+    1: Color(0xFF1A1400),
+    2: Color(0xFFFFFFFF),
+    3: Color(0xFFFFFFFF),
+    4: Color(0xFF04231A),
+    5: Color(0xFF121212),
+    6: Color(0xFF2A0F04),
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Terminal (id 'terminal') -- green phosphor, six intensities.
+//
+// Real phosphor monitors were monochrome, which is what the previous Terminal
+// got wrong by putting rainbow digits on black. One hue, six brightnesses.
+// Like Slate, it stays legible without hue discrimination.
+// ---------------------------------------------------------------------------
+
+const _terminalDark = Palette(
+  background: Color(0xFF000000),
+  surface: Color(0xFF04120A),
+  gridLine: Color(0xFF0F2E1A),
+  boxLine: Color(0xFF1F7A3D),
+  givenText: Color(0xFFD6FFE2),
+  userText: Color(0xFF4EF07A),
+  noteText: Color(0xFF4A8A5E),
+  errorText: Color(0xFFFF5252),
+  errorCell: Color(0xFF2E0D0D),
+  selectedCell: Color(0xFF0E3D20),
+  peerCell: Color(0xFF071F10),
+  selectionRing: Color(0xFF4EF07A),
+  peerScrim: Color(0x2033FF66),
+  primary: Color(0xFF22C55E),
+  hintCell: Color(0xFF125B2E),
+  digitFills: {
+    1: Color(0xFFC9FFD4),
+    2: Color(0xFF8FFFA8),
+    3: Color(0xFF4EF07A),
+    4: Color(0xFF22C55E),
+    5: Color(0xFF12833F),
+    6: Color(0xFF0A5228),
+  },
+  digitTextColors: {
+    1: Color(0xFF00160A),
+    2: Color(0xFF00160A),
+    3: Color(0xFF00160A),
+    4: Color(0xFF00160A),
+    5: Color(0xFFD6FFE2),
+    6: Color(0xFFB9F5CC),
+  },
+);
+
+const _terminalLight = Palette(
+  background: Color(0xFFE8F2EA),
+  surface: Color(0xFFF4FAF5),
+  gridLine: Color(0xFFC6DCCB),
+  boxLine: Color(0xFF1B5E20),
+  givenText: Color(0xFF0B2410),
+  userText: Color(0xFF1B6B39),
+  noteText: Color(0xFF6A8571),
+  errorText: Color(0xFFC62828),
+  errorCell: Color(0xFFF5DBDB),
+  selectedCell: Color(0xFFCFE6D6),
+  peerCell: Color(0xFFDEEDE2),
+  selectionRing: Color(0xFF1B6B39),
+  peerScrim: Color(0x14000000),
+  primary: Color(0xFF1B6B39),
+  hintCell: Color(0xFFC4E3CD),
+  digitFills: {
+    1: Color(0xFFC6E9CE),
+    2: Color(0xFF94D3A4),
+    3: Color(0xFF59B673),
+    4: Color(0xFF2A8850),
+    5: Color(0xFF186036),
+    6: Color(0xFF08361C),
+  },
+  digitTextColors: {
+    1: Color(0xFF0B2410),
+    2: Color(0xFF0B2410),
+    3: Color(0xFF04240F),
+    4: Color(0xFFFFFFFF),
+    5: Color(0xFFFFFFFF),
+    6: Color(0xFFFFFFFF),
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Ember (id 'apocalyptic') -- thermal ramp.
+//
+// Same charred mood as before, but the digits are a heat scale now instead of
+// a rainbow: white-hot, flame, ember, rust, scorch, cold char.
+// ---------------------------------------------------------------------------
+
+const _emberDark = Palette(
+  background: Color(0xFF120806),
+  surface: Color(0xFF1E0F0A),
+  gridLine: Color(0xFF35190F),
+  boxLine: Color(0xFFFF5A1F),
+  givenText: Color(0xFFFFE3D0),
+  userText: Color(0xFFFFB020),
+  noteText: Color(0xFF9A6B55),
+  errorText: Color(0xFFFF5252),
+  errorCell: Color(0xFF45120C),
+  selectedCell: Color(0xFF3D1A0C),
+  peerCell: Color(0xFF24100A),
+  selectionRing: Color(0xFFFF6B18),
+  peerScrim: Color(0x1FFFFFFF),
+  primary: Color(0xFFFF6B18),
+  hintCell: Color(0xFF4A2410),
+  digitFills: {
+    1: Color(0xFFFFE8A3),
+    2: Color(0xFFFFB020),
+    3: Color(0xFFFF6B18),
+    4: Color(0xFFD93A0B),
+    5: Color(0xFF8C2410),
+    6: Color(0xFF4A231A),
+  },
+  digitTextColors: {
+    1: Color(0xFF2B1A00),
+    2: Color(0xFF2B1400),
+    3: Color(0xFF2A0C00),
+    4: Color(0xFFFFFFFF),
+    5: Color(0xFFFFD9C2),
+    6: Color(0xFFE8B9A5),
+  },
+);
+
+const _emberLight = Palette(
+  background: Color(0xFFFAF0E6),
+  surface: Color(0xFFFFF8F0),
+  gridLine: Color(0xFFE8D5C4),
+  boxLine: Color(0xFFC2410C),
+  givenText: Color(0xFF33190C),
+  userText: Color(0xFFC2410C),
+  noteText: Color(0xFF8A6B58),
+  errorText: Color(0xFFB91C1C),
+  errorCell: Color(0xFFFBE0DA),
+  selectedCell: Color(0xFFFCE0BF),
+  peerCell: Color(0xFFF3E7DA),
+  selectionRing: Color(0xFFC2410C),
+  peerScrim: Color(0x14000000),
+  primary: Color(0xFFC2410C),
+  hintCell: Color(0xFFFBD9B4),
+  digitFills: {
+    1: Color(0xFFFFD98A),
+    2: Color(0xFFFFA23A),
+    3: Color(0xFFF2691C),
+    4: Color(0xFFC43B0E),
+    5: Color(0xFF8A2A10),
+    6: Color(0xFF4E2A1E),
+  },
+  digitTextColors: {
+    1: Color(0xFF3A2400),
+    2: Color(0xFF3A1C00),
+    3: Color(0xFF2E0C00),
+    4: Color(0xFFFFFFFF),
+    5: Color(0xFFFFE2D2),
+    6: Color(0xFFF2D5C6),
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Bloom (id 'blossom') -- one floral gradient, petal to iris.
+//
+// The text color flips from ink to white partway down the ramp, which is a
+// consequence of the gradient rather than an inconsistency: the pale end
+// cannot carry white text and the deep end cannot carry ink.
+// ---------------------------------------------------------------------------
+
+const _bloomLight = Palette(
+  background: Color(0xFFFFF7FA),
+  surface: Color(0xFFFFFFFF),
+  gridLine: Color(0xFFF2D9E2),
+  boxLine: Color(0xFFA8437A),
+  givenText: Color(0xFF3A1024),
+  userText: Color(0xFFC2417F),
+  noteText: Color(0xFF9B7A8A),
+  errorText: Color(0xFFC2185B),
+  errorCell: Color(0xFFFDE0E9),
+  selectedCell: Color(0xFFFBDCE9),
+  peerCell: Color(0xFFFCEFF4),
+  selectionRing: Color(0xFFC2417F),
+  peerScrim: Color(0x14000000),
+  primary: Color(0xFFC2417F),
+  hintCell: Color(0xFFF7D2E4),
+  digitFills: {
+    1: Color(0xFFFFD9E1),
+    2: Color(0xFFF7A8BE),
+    3: Color(0xFFE85A88),
+    4: Color(0xFFB85CB0),
+    5: Color(0xFF7B54B8),
+    6: Color(0xFF463D8C),
+  },
+  digitTextColors: {
+    1: Color(0xFF4A1526),
+    2: Color(0xFF4A1526),
+    3: Color(0xFF40101F),
+    4: Color(0xFF2A0A28),
+    5: Color(0xFFFFFFFF),
+    6: Color(0xFFFFFFFF),
+  },
+);
+
+const _bloomDark = Palette(
+  background: Color(0xFF150C1A),
+  surface: Color(0xFF221430),
+  gridLine: Color(0xFF33204A),
+  boxLine: Color(0xFFC77DD9),
+  givenText: Color(0xFFFCE4F0),
+  userText: Color(0xFFF58FB0),
+  noteText: Color(0xFFA085B0),
+  errorText: Color(0xFFFF6B8A),
+  errorCell: Color(0xFF3D1020),
+  selectedCell: Color(0xFF35204A),
+  peerCell: Color(0xFF1E1228),
+  selectionRing: Color(0xFFE05A8C),
+  peerScrim: Color(0x1FFFFFFF),
+  primary: Color(0xFFE05A8C),
+  hintCell: Color(0xFF3D2452),
+  digitFills: {
+    1: Color(0xFFFFD3E0),
+    2: Color(0xFFF58FB0),
+    3: Color(0xFFE05A8C),
+    4: Color(0xFFB357AE),
+    5: Color(0xFF7E56C8),
+    6: Color(0xFF52409C),
+  },
+  digitTextColors: {
+    1: Color(0xFF3B0E22),
+    2: Color(0xFF3B0E22),
+    3: Color(0xFF2A0716),
+    4: Color(0xFF24082A),
+    5: Color(0xFFFFFFFF),
+    6: Color(0xFFFFFFFF),
   },
 );
 
@@ -541,39 +642,49 @@ class AppPalettes {
     dark: _retroDark,
   );
 
-  // Ids for these three predate their redesign ('modern', 'postmodern',
+  // Ids for these three predate their redesigns ('modern', 'postmodern',
   // 'apocalyptic') and are what existing installs have saved in Hive, so the
-  // ids stay put while the look and display name move on.
-  static const terminal = PaletteScheme(
+  // ids stay put while the look and display name move on. Anyone on a saved
+  // scheme sees a different board after upgrading -- that is the intended
+  // trade, and it beats silently resetting their choice to the default.
+  static const slate = PaletteScheme(
     id: 'modern',
-    name: 'Terminal',
-    description: 'Phosphor CRT on pure black',
-    light: _terminalLight,
-    dark: _terminalDark,
+    name: 'Slate',
+    description: 'Monochrome — digits read by weight',
+    light: _slateLight,
+    dark: _slateDark,
   );
 
-  static const deepSea = PaletteScheme(
+  static const bauhaus = PaletteScheme(
     id: 'postmodern',
-    name: 'Deep Sea',
-    description: 'Bioluminescence in dark water',
-    light: _deepSeaLight,
-    dark: _deepSeaDark,
+    name: 'Bauhaus',
+    description: 'Primary shapes on bone paper',
+    light: _bauhausLight,
+    dark: _bauhausDark,
+  );
+
+  static const terminal = PaletteScheme(
+    id: 'terminal',
+    name: 'Terminal',
+    description: 'Green phosphor, six intensities',
+    light: _terminalLight,
+    dark: _terminalDark,
   );
 
   static const ember = PaletteScheme(
     id: 'apocalyptic',
     name: 'Ember',
-    description: 'Fire and ash on charred ground',
+    description: 'Thermal ramp, white-hot to char',
     light: _emberLight,
     dark: _emberDark,
   );
 
-  static const blossom = PaletteScheme(
+  static const bloom = PaletteScheme(
     id: 'blossom',
-    name: 'Blossom',
-    description: 'Pastel petals, plum nights',
-    light: _blossomLight,
-    dark: _blossomDark,
+    name: 'Bloom',
+    description: 'One floral gradient, petal to iris',
+    light: _bloomLight,
+    dark: _bloomDark,
   );
 
   static const classic = PaletteScheme(
@@ -588,10 +699,11 @@ class AppPalettes {
 
   static const all = <PaletteScheme>[
     retro,
+    slate,
+    bauhaus,
     terminal,
-    deepSea,
     ember,
-    blossom,
+    bloom,
     classic,
   ];
 
