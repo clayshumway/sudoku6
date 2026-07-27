@@ -1,11 +1,11 @@
 {
-    "name": "sudoku6",
-    "short_name": "sudoku6",
+    "name": "Sudoku 6",
+    "short_name": "Sudoku 6",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "A more concise Sudoku puzzle game.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
