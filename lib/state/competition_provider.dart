@@ -33,6 +33,11 @@ class CompetitionView {
   /// Rematch button (which extends the chain from its tip).
   final Competition? rematchTip;
 
+  /// Async only: rounds the signed-in player has finished. Their position is
+  /// derived from this rather than read from the competition, because async
+  /// has no shared round pointer -- every player is somewhere different.
+  final Set<int> myFinishedRounds;
+
   const CompetitionView({
     required this.competition,
     required this.players,
@@ -41,7 +46,16 @@ class CompetitionView {
     required this.finishedCurrentRound,
     required this.readyNextRound,
     required this.rematchTip,
+    this.myFinishedRounds = const {},
   });
+
+  /// The round this player plays next, or null when they've played them all.
+  int? get myNextRound {
+    final next = myFinishedRounds.length + 1;
+    return next > competition.rounds ? null : next;
+  }
+
+  bool get iAmDone => myNextRound == null;
 
   /// True only while there is an ongoing rematch worth pointing people at.
   bool get rematchJoinable => rematchTip != null && !rematchTip!.isComplete;
@@ -116,6 +130,15 @@ final competitionViewProvider =
       } catch (_) {}
     }
 
+    // Async only, and auxiliary like the rest: an empty set just means the
+    // screen offers round 1, which the server rejects if that's wrong.
+    var mine = const <int>{};
+    if (competition.isAsync) {
+      try {
+        mine = await repo.myFinishedRounds(id);
+      } catch (_) {}
+    }
+
     return CompetitionView(
       competition: competition,
       players: players,
@@ -124,6 +147,7 @@ final competitionViewProvider =
       finishedCurrentRound: finished,
       readyNextRound: ready,
       rematchTip: rematchTip,
+      myFinishedRounds: mine,
     );
   }
 
@@ -169,13 +193,15 @@ class CompeteController extends Notifier<CompeteState> {
   Future<void> create({
     required Difficulty difficulty,
     required int rounds,
+    CompetitionMode mode = CompetitionMode.async,
   }) async {
     final repo = ref.read(competitionRepositoryProvider);
     if (repo == null) return;
 
     state = const CompeteState(action: CompeteAction.working);
     try {
-      final code = await repo.create(difficulty: difficulty, rounds: rounds);
+      final code =
+          await repo.create(difficulty: difficulty, rounds: rounds, mode: mode);
       final competition = await repo.byCode(code);
       state = CompeteState(competitionId: competition?.id);
     } on CompetitionException catch (e) {

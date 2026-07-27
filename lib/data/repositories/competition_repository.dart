@@ -2,6 +2,14 @@ import '../../engine/models/difficulty.dart';
 
 enum CompetitionStatus { lobby, active, complete }
 
+/// How rounds are paced.
+///
+/// [sync] is the original: the host starts each round and everyone plays it at
+/// the same moment, against one shared clock. [async] lets each player take
+/// rounds whenever they like, against their own clock, with standings showing
+/// each player's total through their own last completed round.
+enum CompetitionMode { sync, async }
+
 class Competition {
   final String id;
   final String code;
@@ -10,6 +18,7 @@ class Competition {
   final int rounds;
   final int currentRound;
   final CompetitionStatus status;
+  final CompetitionMode mode;
   final DateTime createdAt;
 
   /// Set once someone starts a rematch of this (finished) competition.
@@ -25,12 +34,14 @@ class Competition {
     required this.currentRound,
     required this.status,
     required this.createdAt,
+    this.mode = CompetitionMode.sync,
     this.rematchId,
   });
 
   bool isHost(String? userId) => userId != null && userId == hostId;
   bool get inLobby => status == CompetitionStatus.lobby;
   bool get isComplete => status == CompetitionStatus.complete;
+  bool get isAsync => mode == CompetitionMode.async;
 }
 
 class CompetitionPlayer {
@@ -82,7 +93,11 @@ class CompetitionException implements Exception {
 
 abstract class CompetitionRepository {
   /// Creates a competition and returns its share code.
-  Future<String> create({required Difficulty difficulty, required int rounds});
+  Future<String> create({
+    required Difficulty difficulty,
+    required int rounds,
+    CompetitionMode mode = CompetitionMode.async,
+  });
 
   /// Joins by share code. Idempotent -- re-joining is not an error.
   Future<String> join(String code);
@@ -110,6 +125,25 @@ abstract class CompetitionRepository {
     required String competitionId,
     required int roundNumber,
   });
+
+  /// Async only. Opens [roundNumber] for the caller and returns its seed,
+  /// stamping their personal start clock server-side.
+  ///
+  /// Rounds must be taken in order, which the server enforces -- the seed for
+  /// a round you haven't reached is not readable, so this is the only way to
+  /// obtain one.
+  Future<int> startRound({
+    required String competitionId,
+    required int roundNumber,
+  });
+
+  /// Async only, host only. Ends a competition that still has unplayed rounds
+  /// -- the way out when someone joins and never plays.
+  Future<void> closeCompetition(String competitionId);
+
+  /// Round numbers the caller has already finished, used to work out which
+  /// round they're on. Async has no shared round pointer to read.
+  Future<Set<int>> myFinishedRounds(String competitionId);
 
   /// Submits a finished round. Returns the **server-computed** elapsed time:
   /// the client never supplies it, so a reported time can't be invented.

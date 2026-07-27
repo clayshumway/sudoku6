@@ -28,7 +28,59 @@ class _CompetitionScreenState extends ConsumerState<CompetitionScreen> {
   bool _starting = false;
   bool _readying = false;
   bool _rematching = false;
+  bool _closing = false;
   String? _error;
+
+  /// Async: opening a round is a server call, not a navigation. The seed for a
+  /// round you haven't reached isn't readable, so start_round is the only way
+  /// to obtain one -- and it's what stamps your personal clock.
+  Future<void> _playAsync(CompetitionView view) async {
+    final repo = ref.read(competitionRepositoryProvider);
+    final round = view.myNextRound;
+    if (repo == null || round == null) return;
+
+    setState(() {
+      _starting = true;
+      _error = null;
+    });
+    try {
+      final seed = await repo.startRound(
+          competitionId: widget.competitionId, roundNumber: round);
+      if (!mounted) return;
+      context.push(
+        '${AppRoutes.game}/${view.competition.difficulty.name}'
+        '?seed=$seed'
+        '&competition=${widget.competitionId}'
+        '&round=$round',
+      );
+    } on CompetitionException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not open the round.');
+    } finally {
+      if (mounted) setState(() => _starting = false);
+    }
+  }
+
+  Future<void> _close() async {
+    final repo = ref.read(competitionRepositoryProvider);
+    if (repo == null) return;
+
+    setState(() {
+      _closing = true;
+      _error = null;
+    });
+    try {
+      await repo.closeCompetition(widget.competitionId);
+      ref.invalidate(competitionViewProvider(widget.competitionId));
+    } on CompetitionException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not end the competition.');
+    } finally {
+      if (mounted) setState(() => _closing = false);
+    }
+  }
 
   /// One button, whatever the chain's state: the RPC walks to the newest
   /// competition in the rematch chain and either hands back the ongoing
@@ -144,12 +196,16 @@ class _CompetitionScreenState extends ConsumerState<CompetitionScreen> {
           starting: _starting,
           readying: _readying,
           rematching: _rematching,
+          closing: _closing,
           error: _error,
           onStart: () => _startRound(view),
           onShare: () => _share(view.competition.code),
-          onPlay: () => _play(view),
+          onPlay: () => view.competition.isAsync
+              ? _playAsync(view)
+              : _play(view),
           onReady: _markReady,
           onRematch: () => _goToRematch(view),
+          onClose: _close,
         ),
         ),
       ),
@@ -187,12 +243,14 @@ class _Body extends StatelessWidget {
   final bool starting;
   final bool readying;
   final bool rematching;
+  final bool closing;
   final String? error;
   final VoidCallback onStart;
   final VoidCallback onShare;
   final VoidCallback onPlay;
   final VoidCallback onReady;
   final VoidCallback onRematch;
+  final VoidCallback onClose;
 
   const _Body({
     required this.view,
@@ -200,12 +258,14 @@ class _Body extends StatelessWidget {
     required this.starting,
     required this.readying,
     required this.rematching,
+    required this.closing,
     required this.error,
     required this.onStart,
     required this.onShare,
     required this.onPlay,
     required this.onReady,
     required this.onRematch,
+    required this.onClose,
   });
 
   @override
@@ -231,8 +291,7 @@ class _Body extends StatelessWidget {
         _CodeCard(code: c.code, onShare: onShare),
         const SizedBox(height: 20),
         Text(
-          '${difficultyLabel(c.difficulty)} · '
-          '${c.isComplete ? "finished" : "round ${c.currentRound == 0 ? 1 : c.currentRound} of ${c.rounds}"}',
+          '${difficultyLabel(c.difficulty)} · ${_subtitle(c)}',
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 16),
@@ -340,8 +399,79 @@ class _Body extends StatelessWidget {
                 style: TextStyle(color: palette.noteText)),
         ],
 
-        // A round is live.
-        if (!c.inLobby && !c.isComplete) ...[
+        // Async: you're on your own schedule, so there's exactly one thing to
+        // decide -- play your next round, or wait for everyone else to catch
+        // up. No lobby, no ready gate, no host start button.
+        if (c.isAsync && !c.isComplete) ...[
+          if (!view.iAmDone)
+            FilledButton(
+              onPressed: starting ? null : onPlay,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: starting
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : Text('Play round ${view.myNextRound} of ${c.rounds}'),
+              ),
+            )
+          else ...[
+            Row(
+              children: [
+                Icon(Icons.check_circle, color: palette.primary, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "You've finished all ${c.rounds} rounds.",
+                    style: TextStyle(color: palette.noteText),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Standings settle once everyone else finishes. '
+              'They can play whenever they like.',
+              style: TextStyle(fontSize: 12, color: palette.noteText),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Text(
+            view.players.length < 2
+                ? 'Nobody else has joined yet — share the code above. '
+                    'People can join and start at any time.'
+                : '${view.players.length} players. Everyone plays the same '
+                    'puzzles, on their own clock.',
+            style: TextStyle(fontSize: 12, color: palette.noteText),
+          ),
+          // Without a deadline a competition can sit open forever waiting on
+          // someone who joined and never played. This is the way out.
+          if (isHost) ...[
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: closing ? null : onClose,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: closing
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('End it now and declare a winner'),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Ends the competition for everyone, scoring the rounds actually '
+              'played.',
+              style: TextStyle(fontSize: 12, color: palette.noteText),
+            ),
+          ],
+        ],
+
+        // Sync: a round is live.
+        if (!c.isAsync && !c.inLobby && !c.isComplete) ...[
           if (!iFinished)
             FilledButton(
               onPressed: onPlay,
@@ -432,6 +562,14 @@ class _Body extends StatelessWidget {
   }
 }
 
+String _subtitle(Competition c) {
+  if (c.isComplete) return 'finished';
+  if (c.isAsync) {
+    return '${c.rounds} round${c.rounds == 1 ? "" : "s"} · play anytime';
+  }
+  return 'round ${c.currentRound == 0 ? 1 : c.currentRound} of ${c.rounds}';
+}
+
 class _CodeCard extends StatelessWidget {
   final String code;
   final VoidCallback onShare;
@@ -493,6 +631,13 @@ class _Standings extends StatelessWidget {
           Builder(builder: (context) {
             final s = view.standings[i];
             final isMe = s.userId == myId;
+            final total = view.competition.rounds;
+            // Rounds played is stated as "3/5" rather than "3 rounds" because
+            // in async the leader on time is often just the person who has
+            // played least. The sort already handles correctness; this is what
+            // stops the screen from reading like a lie.
+            final stillPlaying =
+                s.roundsPlayed < total && !view.competition.isComplete;
             return Container(
               color: isMe ? palette.selectedCell : null,
               child: ListTile(
@@ -508,8 +653,9 @@ class _Standings extends StatelessWidget {
                         fontWeight:
                             isMe ? FontWeight.w700 : FontWeight.w500)),
                 subtitle: Text(
-                  '${s.roundsPlayed} round${s.roundsPlayed == 1 ? "" : "s"} · '
-                  '${s.totalMistakes} mistakes',
+                  '${s.roundsPlayed}/$total rounds · '
+                  '${s.totalMistakes} mistakes'
+                  '${stillPlaying ? " · still playing" : ""}',
                   style: TextStyle(fontSize: 12, color: palette.noteText),
                 ),
                 trailing: Text(
