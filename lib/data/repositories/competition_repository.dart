@@ -90,6 +90,14 @@ abstract class CompetitionRepository {
   Future<Competition?> byCode(String code);
   Future<Competition?> byId(String id);
 
+  /// The newest competition in [competitionId]'s rematch chain, or null when
+  /// no rematch has been started.
+  ///
+  /// Server-side walk rather than repeated [byId] calls: reads are restricted
+  /// to players, and the whole point of this lookup is the player who is *not*
+  /// in the rematch -- they'd see nothing walking the chain themselves.
+  Future<Competition?> chainTip(String competitionId);
+
   Future<List<CompetitionPlayer>> players(String competitionId);
 
   /// Host-only. Enforced server-side, including the two-player minimum.

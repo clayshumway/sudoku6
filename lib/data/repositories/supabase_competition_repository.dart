@@ -90,6 +90,15 @@ class SupabaseCompetitionRepository implements CompetitionRepository {
   }
 
   @override
+  Future<Competition?> chainTip(String competitionId) async {
+    final rows = await _client
+        .rpc('competition_chain_tip', params: {'p_competition': competitionId});
+    final list = rows as List;
+    if (list.isEmpty) return null;
+    return _toCompetition(list.first as Map<String, dynamic>);
+  }
+
+  @override
   Future<List<CompetitionPlayer>> players(String competitionId) async {
     final rows = await _client
         .from('competition_players')
