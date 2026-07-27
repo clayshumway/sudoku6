@@ -59,9 +59,29 @@ class GameController extends Notifier<GameState?> {
     _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       final current = state;
-      if (current == null || current.isComplete) return;
+      if (current == null || current.isComplete || current.isPaused) return;
       state = current.copyWith(elapsedSeconds: current.elapsedSeconds + 1);
     });
+  }
+
+  /// Stops the displayed clock. The screen hides the board while paused --
+  /// a pause you could think through would just be a slower solve.
+  ///
+  /// In a competition round this is only half the story: the recorded time is
+  /// computed from server clocks, so the round must also be paused server-side
+  /// (see CompetitionRepository.pauseRound). The screen does both.
+  void pause() {
+    final current = state;
+    if (current == null || current.isComplete || current.isPaused) return;
+    state = current.copyWith(isPaused: true, clearActiveHint: true);
+  }
+
+  /// Named unpause, not resume: resume() already means "reload the saved
+  /// game for this tier".
+  void unpause() {
+    final current = state;
+    if (current == null || !current.isPaused) return;
+    state = current.copyWith(isPaused: false);
   }
 
   void selectCell(int index) {
@@ -74,6 +94,9 @@ class GameController extends Notifier<GameState?> {
   void placeDigit(int digit) {
     final current = state;
     if (current == null || current.selectedCell == null) return;
+    // The paused screen replaces the board entirely, so this is belt and
+    // braces -- but it's the one path that changes a recorded score.
+    if (current.isPaused) return;
     final index = current.selectedCell!;
     if (current.puzzle.givens[index] != 0) return;
 

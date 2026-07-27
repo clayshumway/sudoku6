@@ -7,6 +7,7 @@ import '../../../state/competition_provider.dart';
 import '../../../state/game_controller.dart';
 import '../../../utils/difficulty_label.dart';
 import '../../routing/app_router.dart';
+import '../../theme/palette.dart';
 import '../../widgets/page_body.dart';
 import '../results/game_summary.dart';
 import 'widgets/game_toolbar.dart';
@@ -43,6 +44,53 @@ class GameScreen extends ConsumerStatefulWidget {
 }
 
 class _GameScreenState extends ConsumerState<GameScreen> {
+  bool _pauseBusy = false;
+
+  /// Pausing a competition round has to reach the server: the recorded time is
+  /// computed there, so stopping only the on-screen clock would leave the real
+  /// time climbing behind a frozen display. The local pause is applied only
+  /// once the server has accepted it, so a failed call can't quietly cost
+  /// someone the round.
+  Future<void> _togglePause() async {
+    final state = ref.read(gameControllerProvider);
+    if (state == null || state.isComplete || _pauseBusy) return;
+    final controller = ref.read(gameControllerProvider.notifier);
+    final pausing = !state.isPaused;
+
+    if (!widget.isCompetitionRound) {
+      pausing ? controller.pause() : controller.unpause();
+      return;
+    }
+
+    setState(() => _pauseBusy = true);
+    try {
+      final repo = ref.read(competitionRepositoryProvider);
+      if (pausing) {
+        await repo?.pauseRound(
+            competitionId: widget.competitionId!,
+            roundNumber: widget.roundNumber!);
+        controller.pause();
+      } else {
+        await repo?.resumeRound(
+            competitionId: widget.competitionId!,
+            roundNumber: widget.roundNumber!);
+        controller.unpause();
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(pausing
+                ? "Couldn't pause — your clock is still running."
+                : "Couldn't resume. Check your connection."),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _pauseBusy = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -117,7 +165,23 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(difficultyLabel(widget.difficulty))),
+      appBar: AppBar(
+        title: Text(difficultyLabel(widget.difficulty)),
+        actions: [
+          IconButton(
+            onPressed: state.isComplete || _pauseBusy ? null : _togglePause,
+            icon: _pauseBusy
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : Icon(state.isPaused
+                    ? Icons.play_arrow_rounded
+                    : Icons.pause_rounded),
+            tooltip: state.isPaused ? 'Resume' : 'Pause',
+          ),
+        ],
+      ),
       body: SafeArea(
         child: PageBody(
           maxWidth: 520,
@@ -134,23 +198,69 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   ],
                 ),
               ),
-              Expanded(
-                // Biased above center: dead-centering the board in the
-                // leftover space read as a large arbitrary gap under the
-                // timer on tall phones.
-                child: Align(
-                  alignment: const Alignment(0, -0.55),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: SudokuGridWidget(state: state),
+              // Paused replaces the board rather than covering it. An overlay
+              // would still leave the puzzle on screen to study, which would
+              // make pausing a way to buy thinking time for free.
+              if (state.isPaused)
+                Expanded(child: _PausedPanel(onResume: _togglePause))
+              else ...[
+                Expanded(
+                  // Biased above center: dead-centering the board in the
+                  // leftover space read as a large arbitrary gap under the
+                  // timer on tall phones.
+                  child: Align(
+                    alignment: const Alignment(0, -0.55),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: SudokuGridWidget(state: state),
+                    ),
                   ),
                 ),
-              ),
-              NumberPadWidget(state: state),
-              GameToolbar(state: state),
+                NumberPadWidget(state: state),
+                GameToolbar(state: state),
+              ],
               const SizedBox(height: 8),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PausedPanel extends StatelessWidget {
+  final VoidCallback onResume;
+
+  const _PausedPanel({required this.onResume});
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.pause_circle_outline, size: 64, color: palette.primary),
+            const SizedBox(height: 16),
+            Text('Paused', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 8),
+            Text(
+              'The clock is stopped and the board is hidden.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: palette.noteText),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: onResume,
+              icon: const Icon(Icons.play_arrow_rounded, size: 18),
+              label: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                child: Text('Resume'),
+              ),
+            ),
+          ],
         ),
       ),
     );
